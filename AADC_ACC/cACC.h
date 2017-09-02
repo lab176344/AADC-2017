@@ -75,9 +75,13 @@ protected:
 	cInputPin m_oStart;
 	cObjectPtr<IMediaTypeDescription> m_pDescStart;
 
-	// input speed
+	// input speed controller
 	cInputPin   m_oInputSpeedController;
 	cObjectPtr<IMediaTypeDescription> m_pDescSpeed;
+
+	// input current speed
+	cInputPin   m_oInputCurrentSpeed;
+	cObjectPtr<IMediaTypeDescription> m_pDescCurrentSpeed;
 
 	// input steering
 	cInputPin   m_oInputSteering;
@@ -117,8 +121,11 @@ protected:
 
 	/* MEMBER VARIABLES INPUT*/
 
+	tBool isInitialized_;
+
 	tBool m_bStart;
-	tFloat32 m_fSpeedInput;
+	tFloat32 m_fSpeedControllerInput;
+	tFloat32 m_fCurrentSpeedInput;
 	tFloat32 m_fSteeringInput;
 
 	/*
@@ -146,6 +153,7 @@ protected:
 
 
 	// time stamp
+	tTimeStamp init_time;
 	tUInt32 timestamp;
 
 	// distance over all
@@ -223,8 +231,10 @@ protected:
 
 
 	private:
-
+		// properties
 		tFloat32    m_fMaxDist, m_fMaxDistCurve, m_fSteeringToSwitchFocus;
+
+		tFloat m_fStopTTC, m_fReduceSpeedTTC;
 };
 
 //*************************************************************************************************

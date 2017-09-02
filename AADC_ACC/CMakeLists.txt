@@ -12,5 +12,5 @@ adtf_add_filter(${FILTER_NAME}
 adtf_set_folder(${FILTER_NAME} ACC) 
 
 # Specify where it should be installed to
-adtf_install_plugin(${FILTER_NAME} ${CMAKE_INSTALL_BINARY})
-#adtf_install_plugin(${FILTER_NAME} ${AADC_INSTALL_DIR})
+#adtf_install_plugin(${FILTER_NAME} ${CMAKE_INSTALL_BINARY})
+adtf_install_plugin(${FILTER_NAME} ${AADC_INSTALL_DIR})

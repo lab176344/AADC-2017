@@ -24,6 +24,8 @@ THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR
 #define MAX_DIST		"cACC::max_dist"
 #define MAX_DIST_CURVE	"cACC::max_dist_curve"
 #define STEERING_SWITCH_US_FOCUS	"cACC::steering_switch_focus"
+#define STOP_TTC	"cACC::stop_ttc"
+#define REDUCE_SPEED_TTC	"cACC::reduce_speed_ttc"
 
 ADTF_FILTER_PLUGIN("ACC", OID_ADTF_ACC_FILTER, cACC);
 
@@ -43,6 +45,13 @@ cACC::cACC(const tChar* __info):cFilter(__info)
     SetPropertyBool(STEERING_SWITCH_US_FOCUS NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(STEERING_SWITCH_US_FOCUS NSSUBPROP_DESCRIPTION, "at that steering switch the US focus");
 
+	SetPropertyFloat(STOP_TTC,1.5);
+    SetPropertyBool(STOP_TTC NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(STOP_TTC NSSUBPROP_DESCRIPTION, "stop under this time to collision");
+
+	SetPropertyFloat(REDUCE_SPEED_TTC,4);
+    SetPropertyBool(REDUCE_SPEED_TTC NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(REDUCE_SPEED_TTC NSSUBPROP_DESCRIPTION, "reduce speed under this time to collision");
 }
 
 cACC::~cACC()
@@ -70,13 +79,21 @@ tResult cACC::Init(tInitStage eStage, __exception)
 		RETURN_IF_FAILED(m_oStart.Create("Start", pTypeSignalstart, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oStart));
 
-		// create pin for speed input
+		// create pin for speed controller
 		tChar const * strDescSignalSpeed = pDescManager->GetMediaDescription("tSignalValue");
 		RETURN_IF_POINTER_NULL(strDescSignalSpeed);
 		cObjectPtr<IMediaType> pTypeSignalSpeed = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalSpeed, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
 		RETURN_IF_FAILED(pTypeSignalSpeed->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescSpeed));
-		RETURN_IF_FAILED(m_oInputSpeedController.Create("Speed", pTypeSignalSpeed, static_cast<IPinEventSink*> (this)));
+		RETURN_IF_FAILED(m_oInputSpeedController.Create("Speed Controller", pTypeSignalSpeed, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oInputSpeedController));
+
+		// create pin for current speed
+		tChar const * strDescCurrentSpeed = pDescManager->GetMediaDescription("tSignalValue");
+		RETURN_IF_POINTER_NULL(strDescCurrentSpeed);
+		cObjectPtr<IMediaType> pTypeCurrentSpeed = new cMediaType(0, 0, 0, "tSignalValue", strDescCurrentSpeed, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+		RETURN_IF_FAILED(pTypeCurrentSpeed->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescCurrentSpeed));
+		RETURN_IF_FAILED(m_oInputCurrentSpeed.Create("Current Speed", pTypeSignalSpeed, static_cast<IPinEventSink*> (this)));
+		RETURN_IF_FAILED(RegisterPin(&m_oInputCurrentSpeed));
 
 		// create pin for steering input
 		tChar const * strDescSignalSteering = pDescManager->GetMediaDescription("tSignalValue");
@@ -143,6 +160,8 @@ tResult cACC::Init(tInitStage eStage, __exception)
     else if (eStage == StageGraphReady)
     {
         // init all member variables
+		isInitialized_=tFalse;
+		init_time = _clock->GetStreamTime();
 		m_bStart=tFalse;
 		m_szIdsUsStructSet=tFalse;
 
@@ -203,6 +222,14 @@ tResult cACC::ReadProperties(const tChar* strPropertyName)
 	{
 		m_fSteeringToSwitchFocus = static_cast<tFloat32> (GetPropertyFloat(STEERING_SWITCH_US_FOCUS));
 	}
+		if (NULL == strPropertyName || cString::IsEqual(strPropertyName, STOP_TTC))
+	{
+		m_fStopTTC = static_cast<tFloat32> (GetPropertyFloat(STOP_TTC));
+	}
+		if (NULL == strPropertyName || cString::IsEqual(strPropertyName, REDUCE_SPEED_TTC))
+	{
+		m_fReduceSpeedTTC = static_cast<tFloat32> (GetPropertyFloat(REDUCE_SPEED_TTC));
+	}
 	RETURN_NOERROR;
 }
 
@@ -218,6 +245,28 @@ tResult cACC::OnPinEvent(IPin* pSource,
         // so we received a media sample, so this pointer better be valid.
         RETURN_IF_POINTER_NULL(pMediaSample);
 
+/*
+		if (!isInitialized_)
+		{
+			if(_clock->GetStreamTime()-init_time < 1e6)
+			{
+				m_fSteeringOutput=0;
+				m_fAccelerationOutput=0;
+				m_bStart=tFalse;
+				m_szIdsUsStructSet=tFalse;
+				m_bFlagTimeOvertake=tFalse;
+				LOG_INFO(cString::Format("Motor is initializing"));
+				TransmitOutput();
+				RETURN_NOERROR;
+			}
+			else
+			{
+				isInitialized_ = true;
+			}
+		}
+
+*/
+
 		// Input signal at Start
 		if (pSource == &m_oStart)
 		{
@@ -226,6 +275,14 @@ tResult cACC::OnPinEvent(IPin* pSource,
 			pCoderInput->Get("bValue", (tVoid*)&m_bStart);
 			pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
 			m_pDescStart->Unlock(pCoderInput);
+
+			// stop signal
+			if(!m_bStart)
+			{
+				m_fSteeringOutput=0;
+				m_fAccelerationOutput=0;
+			}
+				
 		}
 		else if(pSource == &m_oInputUsStruct)
         {
@@ -236,9 +293,17 @@ tResult cACC::OnPinEvent(IPin* pSource,
         {
 			cObjectPtr<IMediaCoder> pCoderInput;
 			RETURN_IF_FAILED(m_pDescSpeed->Lock(pMediaSample, &pCoderInput));
-			pCoderInput->Get("f32Value", (tVoid*)&m_fSpeedInput);
+			pCoderInput->Get("f32Value", (tVoid*)&m_fSpeedControllerInput);
 			pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
 			m_pDescSpeed->Unlock(pCoderInput);
+        }
+		else if(pSource == &m_oInputCurrentSpeed)
+        {
+			cObjectPtr<IMediaCoder> pCoderInput;
+			RETURN_IF_FAILED(m_pDescCurrentSpeed->Lock(pMediaSample, &pCoderInput));
+			pCoderInput->Get("f32Value", (tVoid*)&m_fCurrentSpeedInput);
+			pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+			m_pDescCurrentSpeed->Unlock(pCoderInput);
         }
 		else if (pSource == &m_oInputSteering)
 		{
@@ -260,7 +325,12 @@ tResult cACC::OnPinEvent(IPin* pSource,
 				m_fSteeringOutput=m_fSteeringInput;
 				CalculateSpeed();
 			}
-			// Transmit Output
+
+		}
+
+		// only send output ACC is active
+		if(m_bStart)
+		{
 			TransmitOutput();
 		}
 
@@ -339,25 +409,20 @@ tResult cACC::ProcessInputUS(IMediaSample* pMediaSample)
 
         }
 	
-	// iterate through all values and find the minimum
-	tFloat32 buf_UsSignal [10];
-	for (int i=0;i<(int)m_szIdUsStructValues.size();++i)
-	{
-		pCoderInput->Get(m_szIdUsStructValues[i],(tVoid*)&buf_UsSignal);
+	// iterate through all values and save them in m_aUSSensors
+	for (int i=0;i<10;++i)
+	{	
+		tFloat32 buffer=-1;
+		pCoderInput->Get(m_szIdUsStructValues[i],(tVoid*)&buffer);
 		// Wrong Us-values are  0 or -1
-		if (buf_UsSignal>0)
+		if (buffer>0)
 		{
-			pCoderInput->Get(m_szIdUsStructValues[i],(tVoid*)&buf_UsSignal[i]);
-			m_aUSSensors[i]=buf_UsSignal[i];
+			pCoderInput->Get(m_szIdUsStructValues[i],(tVoid*)&buffer);
+			m_aUSSensors[i]=buffer;
+			//LOG_INFO(cString::Format("front left %f", buffer));
 		}
 	}
-	/*
-	m_oUSFrontLeft=buf_UsSignal[US_FRONTLEFT];
-	m_oUSFrontCenterLeft=buf_UsSignal[US_FRONTCENTERLEFT];
-	m_oUSFrontCenter=buf_UsSignal[US_FRONTCENTER];
-	m_oUSFrontCenterRight=buf_UsSignal[US_FRONTCENTERRIGHT];
-	m_oUSFrontRight=buf_UsSignal[US_FRONTRIGHT];
-	*/
+
 	//LOG_INFO(cString::Format("front left %f, frontcenterleft %f", m_oUSFrontLeft, m_oUSFrontCenterLeft));
 	//LOG_INFO(cString::Format("front right %f, frontcenterright %f", m_oUSFrontRight, m_oUSFrontCenterRight));
 	//LOG_INFO(cString::Format("ARRAY center %f   frontcenterleft %f  frontcenterright %f", m_aUSSensors[US_FRONTCENTER], m_aUSSensors[US_FRONTCENTERLEFT], m_aUSSensors[US_FRONTCENTERRIGHT]));
@@ -368,11 +433,11 @@ tResult cACC::ProcessInputUS(IMediaSample* pMediaSample)
 
 tResult cACC::CalculateSpeed()
 {
-
-	// use mutex to access min US value
+	// use mutex to access
 	__synchronized_obj(m_critSecMinimumUsValue);
 
 	tFloat32 fAverageDist;
+	tFloat fTTC;
 
 	// if sterring is bigger then a propertie, then focus on left or right US sensors
 	if((m_fSteeringInput > m_fSteeringToSwitchFocus) || ((-1)*m_fSteeringInput > m_fSteeringToSwitchFocus) )
@@ -381,49 +446,64 @@ tResult cACC::CalculateSpeed()
 		if(m_fSteeringInput>0)
 		{
 			fAverageDist=(m_aUSSensors[US_FRONTCENTER] + 2 * m_aUSSensors[US_FRONTCENTERRIGHT] + m_aUSSensors[US_FRONTRIGHT])/4;
-			// calculate ouput speed linear
-			m_fAccelerationOutput= fAverageDist/m_fMaxDistCurve * m_fSpeedInput;
 		}
 		// focus on left US sensors
 		else
 		{
 			fAverageDist=(m_aUSSensors[US_FRONTCENTER] + 2 * m_aUSSensors[US_FRONTCENTERLEFT] +  m_aUSSensors[US_FRONTLEFT])/4;
-			// calculate ouput speed linear
-			m_fAccelerationOutput= fAverageDist/m_fMaxDistCurve * m_fSpeedInput;
 		}
 
-		// // calculate ouput speed linear for curves
-		if(fAverageDist < m_fMaxDistCurve)
-		{
-			m_fAccelerationOutput= fAverageDist/m_fMaxDist * m_fSpeedInput;
-		}
-		else
-		{
-			m_fAccelerationOutput=m_fSpeedInput;
-		}
 	}
 	// focus on front US sensors
 	else
 	{
-		fAverageDist=(4 * m_aUSSensors[US_FRONTCENTER] + m_aUSSensors[US_FRONTCENTERLEFT] + m_aUSSensors[US_FRONTCENTERRIGHT])/6;
-
-		// calculate ouput speed linear
-		if(fAverageDist < m_fMaxDist)
-		{
-			m_fAccelerationOutput= fAverageDist/m_fMaxDist * m_fSpeedInput;
-		}
-		else
-		{
-			m_fAccelerationOutput=m_fSpeedInput;
-		}
+		// fAverageDist=(4 * m_aUSSensors[US_FRONTCENTER] + m_aUSSensors[US_FRONTCENTERLEFT] + m_aUSSensors[US_FRONTCENTERRIGHT])/6;
+		fAverageDist=m_aUSSensors[US_FRONTCENTER];
 	}
-	// LOG_INFO(cString::Format("SPEED center %f  center left %f   center rigth %f", m_aUSSensors[US_FRONTCENTER], m_aUSSensors[US_FRONTCENTERLEFT], m_aUSSensors[US_FRONTCENTERRIGHT]));
-	// LOG_INFO(cString::Format("SPEED fAverageDist %f", fAverageDist));
-	// LOG_INFO(cString::Format(" SPEED output speed %f", m_fAccelerationOutput));
 
-	// if speed is to low --> overtake
-	if(m_fAccelerationOutput/m_fSpeedInput < 0.2)
+	LOG_INFO(cString::Format("cm %f, m %f", fAverageDist, fAverageDist/100));
+
+	// fAverageDist from [cm] to [m]
+	fAverageDist=fAverageDist/100;
+
+	// calculate TTC
+	fTTC=fAverageDist/m_fCurrentSpeedInput;
+
+	// calculate output speed
+
+	// no reduction of speed
+	if(fTTC>m_fReduceSpeedTTC)
 	{
+		m_fAccelerationOutput=m_fSpeedControllerInput;
+	}
+	else if( (fTTC<=m_fReduceSpeedTTC) && (fTTC >= m_fStopTTC))
+	{
+		tFloat32 factor=1/(m_fReduceSpeedTTC-m_fStopTTC);
+		tFloat32 offset=m_fStopTTC/(m_fReduceSpeedTTC-m_fStopTTC);
+		// y=m*x + t
+		// m_fAccelerationOutput=factor *m_fCurrentSpeedInput - offset;
+		m_fAccelerationOutput=factor * m_fSpeedControllerInput - offset;
+		LOG_INFO(cString::Format("speed %f, factor %f, offset %f, out %f",m_fCurrentSpeedInput, factor, offset, m_fAccelerationOutput));
+	}
+	else if(fTTC < m_fStopTTC)
+	{
+		m_fAccelerationOutput=0;
+		m_fSteeringOutput=0;
+
+
+		//Test
+		m_bStart=tFalse;
+
+				m_bFlagTimeOvertake=tFalse;
+
+				m_bOvertake=tTrue;
+
+				TransmitOutput();
+
+				TransmitOutputOvertake();
+
+		/*
+
 		if(!m_bFlagTimeOvertake)
 		{
 			timestampOvertake=_clock->GetStreamTime();
@@ -431,15 +511,21 @@ tResult cACC::CalculateSpeed()
 		}
 		else
 		{
-			if((_clock->GetStreamTime()-timestampOvertake)/1000000 > 3)
+			// if speed is too slow for a too long time --> wish to overtake
+			if((_clock->GetStreamTime()-timestampOvertake)/1000000 > 2)
 			{
 				m_bStart=tFalse;
 				m_bFlagTimeOvertake=tFalse;
 				m_bOvertake=tTrue;
+				TransmitOutput();
 				TransmitOutputOvertake();
 			}
 		}
+
+		*/
 	}
+
+	LOG_INFO(cString::Format("controller input %f, dist %f, speed %f, TTC %f", m_fSpeedControllerInput, fAverageDist, m_fCurrentSpeedInput, fTTC));
 	
 	RETURN_NOERROR;
 	
@@ -540,46 +626,3 @@ tResult cACC::TransmitOutputOvertake()
 
 	RETURN_NOERROR;
 }
-
-
-
-
-
-
-
-/*
-tResult cACC::CalculateSpeed()
-{
-	// if sterring is bigger then a propertie, then focus on left or right US sensors
-	if((m_fSteeringInput > m_fSteeringToSwitchFocus) || ((-1)*m_fSteeringInput > m_fSteeringToSwitchFocus) )
-	{
-		// focus on right US sensors
-		if(m_fSteeringInput>0)
-		{
-			tFloat32 fAverageDist=(m_oUSFrontCenter + 2 * m_oUSFrontCenterRight + m_oUSFrontRight)/4;
-			// calculate ouput speed linear
-			m_fAccelerationOutput= fAverageDist/m_fMaxDistCurve * m_fSpeedInput;
-		}
-		// focus on left US sensors
-		else
-		{
-			tFloat32 fAverageDist=(m_oUSFrontCenter + 2 * m_oUSFrontCenterLeft + m_oUSFrontLeft)/4;
-			// calculate ouput speed linear
-			m_fAccelerationOutput= fAverageDist/m_fMaxDistCurve * m_fSpeedInput;
-		}
-	}
-	// focus on front US sensors
-	else
-	{
-		tFloat32 fAverageDist=(2 * m_oUSFrontCenter + m_oUSFrontCenterLeft + m_oUSFrontCenterRight)/4;
-
-		LOG_INFO(cString::Format("SPEED center %f  center left %f   center rigth %f", m_oUSFrontCenter, m_oUSFrontCenterLeft, m_oUSFrontCenterRight));
-		LOG_INFO(cString::Format("SPEED fAverageDist %f", fAverageDist));
-		// calculate ouput speed linear
-		m_fAccelerationOutput= fAverageDist/m_fMaxDist * m_fSpeedInput;
-		LOG_INFO(cString::Format(" SPEED output speed %f", m_fAccelerationOutput));
-	}
-	RETURN_NOERROR;
-	
-}
-*/
