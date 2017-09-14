@@ -70,6 +70,7 @@ class cCrossing : public adtf::cFilter
 protected:
     /* INPUT PINS */
 
+	/*
 	// Start
 	cInputPin m_oStart;
 	cObjectPtr<IMediaTypeDescription> m_pDescStart;
@@ -80,10 +81,23 @@ protected:
 	tBufferID m_szIDRoadSignF32Imagesize;
 	tBool m_bIDsRoadSignSet;
 	cObjectPtr<IMediaTypeDescription> m_pDescriptionInputTrafficSign; // mediatype descriptions
+	*/
+
+	// input from situation detection
+	cInputPin m_oSituationDetection;
+	cObjectPtr<IMediaTypeDescription> m_pDescSituationDetection;
 
 	// Distance over all
 	cInputPin m_oDistanceOverall;
 	cObjectPtr<IMediaTypeDescription> m_pDescdistanceoverall;
+
+	// InerMeasUnit
+	cInputPin m_oInerMeasUnit;
+	cObjectPtr<IMediaTypeDescription> m_pDescInerMeasUnit;
+
+	// Infos about Stop Line
+	cInputPin m_oStopLine;
+	cObjectPtr<IMediaTypeDescription> m_pDescStopLine;
 
 	// critical section for current traffic sign
 	cCriticalSection m_critSecCurrentTrafficSign;
@@ -118,6 +132,20 @@ protected:
 
 	tBool m_bStart;
 
+	// InerMeasUnit
+	tFloat32 m_fYawAngle;
+	tFloat32 m_fYawAngleAtStart;
+
+	// infos about stopline
+	tBool m_bStopLineDetected;
+	tFloat32 m_fDist2StopLine;
+	tFloat32 m_fOrientation2StopLine;
+	tBool m_bFlagNoStopLine;
+
+	/* DEBUG */
+
+	tBool m_bDebugModeEnabled;
+
 	/* MEMBER VARIABLES PROCESS*/
 	tBool m_bStarted;
 	tBool m_bStoppedAtLine;
@@ -127,17 +155,22 @@ protected:
 
 	tTimeStamp stop_time;
 
-
 	// time stamp
 	tUInt32 timestamp;
 
+	
 	// traffic sign
-	tFloat32 m_fTrafficSignImageSize;
+	//tFloat32 m_fTrafficSignImageSize;
 	tInt16 m_iTrafficSignID;
+
+	tInt8 m_iManeuverID;
 
 	// distance over all
 	tFloat32 m_fDistanceOverall;
 	tFloat32 m_fDistanceOverall_Start;
+
+	// distance until stop line
+	tFloat32 m_fDist2Go;
 
 	/* MEMBER VARIABLES OUTPUT*/
 	tFloat32 m_fSteeringOutput;
@@ -215,6 +248,8 @@ protected:
 	tResult ProcessManeuver();
 
 	// function to turn right, left or go straight
+	tResult Maneuver(tInt8 iManeuverID, tBool bHaveToStop);
+
 	tResult TurnRight(tBool bHaveToStop);
 	tResult TurnLeft(tBool bHaveToStop);
 	tResult GoStraight();
@@ -226,9 +261,9 @@ protected:
 	private:
 
 		// Properties
-		tFloat32    distance_st1,speed_st1,steer_st1;
-
-		tFloat32    distance_st2,speed_st2,steer_st2;
+		tFloat32    propDist2Stopline, propDistRightTurn, propDistLeftTurn, propDistStraight, propDistGoStraightAfterTurn;
+		tFloat32    propSteerRight, propSteerLeft;
+		tFloat32    speed_st1,speed_st2;
 };
 
 //*************************************************************************************************
