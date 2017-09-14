@@ -220,7 +220,7 @@ tResult cstopline::ProcessVideo(IMediaSample* pSample)
         //Erzeugen eines Graustufenbildes
 	GaussianBlur(imagecut,imagecut2,Size(13,13),0,0, BORDER_DEFAULT); 
         cvtColor(imagecut2, grey, CV_BGR2GRAY);
-        threshold(grey, greythresh, 155, 500, THRESH_BINARY);
+        threshold(grey, greythresh, 160, 500, THRESH_BINARY);
 	
 	Mat temp(greythresh.size(), CV_8UC1);
 	Mat element = getStructuringElement(MORPH_RECT, Size(4, 4));
@@ -274,7 +274,7 @@ tResult cstopline::ProcessVideo(IMediaSample* pSample)
         {
             double a = cos(thetaNoRep[i]), b = sin(thetaNoRep[i]);
             double x0 = a*rhoNoRep[i], y0 = b*rhoNoRep[i];
-	    LOG_INFO(adtf_util::cString::Format("X not %f Y not %f",x0,y0));
+	    //LOG_INFO(adtf_util::cString::Format("X not %f Y not %f",x0,y0));
             
             Point pt1(cvRound(x0 + 1000*(-b)),
                       cvRound(y0 + 1000*(a)));
@@ -285,26 +285,66 @@ tResult cstopline::ProcessVideo(IMediaSample* pSample)
 	    distanceCal = 0.0001*pow(newv,3)-0.0045*pow(newv,2)+0.8652*newv+28.8300;
             DistPack[i] = distanceCal;
         }
+	if (sizeNoRep==0)
+	{
+	distance = 0;
+	Orientation = 0;
+	stop_detect=tFalse;
+	}
+	
 	if (sizeNoRep == 1)
 	{
 	distance = DistPack[0];
 	Orientation = thetaNoRep[0];
+	 tFloat32 difference_dist=abs(distance_prev-distance);
+		if(difference_dist>=60)
+		{
+			stop_detect=tFalse;
+			timeStamp = _clock->GetStreamTime() / 1000;
+			writeOutputs1(0,timeStamp);
+		}
+		else
+		{
+			stop_detect=tTrue;
+			timeStamp = _clock->GetStreamTime() / 1000;
+			writeOutputs1(distance,timeStamp);
+		}
+		distance_prev=distance;
 	}
 	if (sizeNoRep == 2)
 	{
         	if (DistPack[0]<DistPack[1])
         	{
 		distance = DistPack[0];
-		Orientation = thetaNoRep[0];}
+		Orientation = thetaNoRep[0];
+		tFloat32 difference_dist=abs(distance_prev-distance);
+		if(difference_dist>=60)
+		{
+			stop_detect=tFalse;
+			timeStamp = _clock->GetStreamTime() / 1000;
+			writeOutputs1(0,timeStamp);
+		}
+		else
+		{
+			stop_detect=tTrue;
+			timeStamp = _clock->GetStreamTime() / 1000;
+			writeOutputs1(distance,timeStamp);
+		}
+		distance_prev=distance;	
+		}
 
 		else
 		{
 		distance = DistPack[1];
-		Orientation = thetaNoRep[1];}
+		Orientation = thetaNoRep[1];
+		stop_detect=tFalse;		
+		}	
         	}
+	
 	}
 	Orientation = Orientation*180/CV_PI;
-	   LOG_INFO(adtf_util::cString::Format("distance %f Orientation %f", distance,Orientation));
+	   //LOG_INFO(adtf_util::cString::Format("distance %f Orientation %f", distance,Orientation));
+	writeOutputs1(distance,timeStamp);
 
     if (!imagecut.empty())
     {
@@ -354,7 +394,7 @@ tResult cstopline::UpdateInputImageFormat(const tBitmapFormat* pFormat)
     {
         //update member variable
         m_sInputFormat = (*pFormat);
-        LOG_INFO(adtf_util::cString::Format("Input: Size %d x %d ; BPL %d ; Size %d , PixelFormat; %d", m_sInputFormat.nWidth, m_sInputFormat.nHeight, m_sInputFormat.nBytesPerLine, m_sInputFormat.nSize, m_sInputFormat.nPixelFormat));
+        //LOG_INFO(adtf_util::cString::Format("Input: Size %d x %d ; BPL %d ; Size %d , PixelFormat; %d", m_sInputFormat.nWidth, m_sInputFormat.nHeight, m_sInputFormat.nBytesPerLine, m_sInputFormat.nSize, m_sInputFormat.nPixelFormat));
         //create the input matrix
         RETURN_IF_FAILED(BmpFormat2Mat(m_sInputFormat, m_inputImage));
     }
@@ -368,7 +408,7 @@ tResult cstopline::UpdateOutputImageFormat(const cv::Mat& outputImage)
     {
         Mat2BmpFormat(outputImage, m_sOutputFormat);
 
-        LOG_INFO(adtf_util::cString::Format("Output: Size %d x %d ; BPL %d ; Size %d , PixelFormat; %d", m_sOutputFormat.nWidth, m_sOutputFormat.nHeight, m_sOutputFormat.nBytesPerLine, m_sOutputFormat.nSize, m_sOutputFormat.nPixelFormat));
+        //LOG_INFO(adtf_util::cString::Format("Output: Size %d x %d ; BPL %d ; Size %d , PixelFormat; %d", m_sOutputFormat.nWidth, m_sOutputFormat.nHeight, m_sOutputFormat.nBytesPerLine, m_sOutputFormat.nSize, m_sOutputFormat.nPixelFormat));
         //set output format for output pin
         m_oVideoOutputPin.SetFormat(&m_sOutputFormat, NULL);
     }
@@ -382,7 +422,7 @@ tResult cstopline::UpdateOutputImageFormat2(const cv::Mat& outputImage2)
     {
         Mat2BmpFormat(outputImage2, m_sOutputFormat2);
 
-        LOG_INFO(adtf_util::cString::Format("Output: Size %d x %d ; BPL %d ; Size %d , PixelFormat; %d", m_sOutputFormat2.nWidth, m_sOutputFormat2.nHeight, m_sOutputFormat2.nBytesPerLine, m_sOutputFormat2.nSize, m_sOutputFormat2.nPixelFormat));
+        //LOG_INFO(adtf_util::cString::Format("Output: Size %d x %d ; BPL %d ; Size %d , PixelFormat; %d", m_sOutputFormat2.nWidth, m_sOutputFormat2.nHeight, m_sOutputFormat2.nBytesPerLine, m_sOutputFormat2.nSize, m_sOutputFormat2.nPixelFormat));
         //set output format for output pin
         m_oVideoOutputPin1.SetFormat(&m_sOutputFormat2, NULL);
     }

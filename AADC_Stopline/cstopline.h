@@ -213,6 +213,7 @@ tBitmapFormat m_sOutputFormat2;
 	tBool stop_detect;
      tFloat32 distance;
      tFloat32 Orientation;
+     tFloat32 distance_prev;
 	
 };
 
