@@ -44,6 +44,16 @@ protected:
 	cInputPin m_oInputSpeed;
 	cObjectPtr<IMediaTypeDescription> m_pDescriptionInputSpeed;
 
+	// input ultrasonic struct
+	cInputPin    m_oInputUsStruct;
+	cObjectPtr<IMediaTypeDescription> m_pDescriptionUsStruct;
+
+	cCriticalSection m_critSecMinimumUsValue;
+
+    std::vector<tBufferID> m_szIdUsStructValues;
+    std::vector<tBufferID> m_szIdUsStructTss;
+    tBool	 m_szIdsUsStructSet;
+
 
     /* OUTPUT PINS */
 
@@ -73,9 +83,15 @@ protected:
 	tFloat32 m_fSpeedInput;
 	tFloat32 m_fSteeringInput;
 
+	/* DEBUG */
+	tBool m_bDebugModeEnabled;
+
 	/* MEMBER VARIABLES PROCESS*/
 
 	tTimeStamp timestamp;
+
+	// US struct
+	tFloat32 m_aUSSensors[10];
 
 	// distance over all
 	tFloat32 m_fDistanceOverall;
@@ -95,7 +111,9 @@ protected:
         SOLG_NOSTART = 0,
         SOLG_CHANGELANE1,
         SOLG_CHANGELANE2,
-        SOLG_WRONGLANE,
+        SOLG_WRONGLANE_CHECK_FR,
+	SOLG_WRONGLANE_CHECK_R,
+	SOLG_WRONGLANE_CHECK_RR,
         SOLG_CHANGEBACK1,
         SOLG_CHANGEBACK2,
         SOLG_FINISH      
@@ -153,12 +171,17 @@ protected:
     */
     tResult OnPinEvent(IPin* pSource, tInt nEventCode, tInt nParam1, tInt nParam2, IMediaSample* pMediaSample);
 
+	// read US struct
+	tResult ProcessInputUS(IMediaSample* pMediaSample);
+
 	// function to decide the maneuver
 	tResult ProcessManeuver();
 
-	// function to turn right, left or go straight
+	// function to turn right or left
 	tResult TurnRight();
 	tResult TurnLeft();
+	tResult TurnRightBack();
+	tResult TurnLeftBack();
 
 	tResult ReadProperties(const tChar* strPropertyName);
 
@@ -166,8 +189,11 @@ protected:
 
 	private:
 		
-		// Properties
-		tFloat32    m_fPropDist,m_fPropSpeed,m_fPropSteer;
+		// Properties for change part 1
+		tFloat32    m_fPropDist1,m_fPropSpeed1,m_fPropSteer1;
+
+		// Properties for change part 2
+		tFloat32    m_fPropDist2,m_fPropSpeed2,m_fPropSteer2;
 };
 
 //*************************************************************************************************

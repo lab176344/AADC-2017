@@ -22,6 +22,7 @@ THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS “AS IS” AND ANY EXPRES
 using namespace adtf;
 
 #include <aadc_structs.h>
+#include <aadc_enums.h>
 
 
 //{{AFX_INSERT_LOCATION}}

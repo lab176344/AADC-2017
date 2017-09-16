@@ -19,27 +19,52 @@ THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR
 #include "stdafx.h"
 #include "cLaneChange.h"
 
-#define PROP_DISTANCE	"cLaneChange::prop_dist"
-#define PROP_SPEED		"cLaneChange::prop_speed"
-#define PROP_STEER		"cLaneChange::prop_steer"
+// change part 1
+#define PROP_DISTANCE1	"cLaneChange::prop_dist1"
+#define PROP_SPEED1		"cLaneChange::prop_speed1"
+#define PROP_STEER1		"cLaneChange::prop_steer1"
+
+//change part 2
+#define PROP_DISTANCE2	"cLaneChange::prop_dist2"
+#define PROP_SPEED2		"cLaneChange::prop_speed2"
+#define PROP_STEER2		"cLaneChange::prop_steer2"
 
 
 /// Create filter shell
 ADTF_FILTER_PLUGIN("LaneChange", OID_ADTF_LANECHANGE_FILTER, cLaneChange);
 
+using namespace SensorDefinition;
+
 cLaneChange::cLaneChange(const tChar* __info):cFilter(__info)
 {
-	SetPropertyFloat(PROP_DISTANCE,0.5);
-    SetPropertyBool(PROP_DISTANCE NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(PROP_DISTANCE NSSUBPROP_DESCRIPTION, "the distance for lane change");
+	// debug
+	SetPropertyBool("Debug Output to Console",true);
 
-	SetPropertyFloat(PROP_SPEED,20);
-    SetPropertyBool(PROP_SPEED NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(PROP_SPEED NSSUBPROP_DESCRIPTION, "the speed for lane change");
+	// lane change
+	SetPropertyFloat(PROP_DISTANCE1,0.5);
+    SetPropertyBool(PROP_DISTANCE1 NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_DISTANCE1 NSSUBPROP_DESCRIPTION, "the distance for lane change 1");
 
-	SetPropertyFloat(PROP_STEER,60);
-    SetPropertyBool(PROP_STEER NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(PROP_STEER NSSUBPROP_DESCRIPTION, "the steer for lane change");
+	SetPropertyFloat(PROP_SPEED1,15);
+    SetPropertyBool(PROP_SPEED1 NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_SPEED1 NSSUBPROP_DESCRIPTION, "the speed for lane change 1");
+
+	SetPropertyFloat(PROP_STEER1,80);
+    SetPropertyBool(PROP_STEER1 NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_STEER1 NSSUBPROP_DESCRIPTION, "the steer for lane change 1");
+
+	//change back
+	SetPropertyFloat(PROP_DISTANCE2,0.6);
+    SetPropertyBool(PROP_DISTANCE2 NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_DISTANCE2 NSSUBPROP_DESCRIPTION, "the distance for lane change 2");
+
+	SetPropertyFloat(PROP_SPEED2,15);
+    SetPropertyBool(PROP_SPEED2 NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_SPEED2 NSSUBPROP_DESCRIPTION, "the speed for lane change 2");
+
+	SetPropertyFloat(PROP_STEER2,80);
+    SetPropertyBool(PROP_STEER1 NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_STEER1 NSSUBPROP_DESCRIPTION, "the steer for lane change 2");
 }
 
 cLaneChange::~cLaneChange()
@@ -98,6 +123,14 @@ tResult cLaneChange::Init(tInitStage eStage, __exception)
 		RETURN_IF_FAILED(m_oInputSteering.Create("Steering In", pTypeSignalSteering, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oInputSteering));
 
+		// create pin for ultrasonic struct input
+		tChar const * strUltrasonicStruct = pDescManager->GetMediaDescription("tUltrasonicStruct");
+		RETURN_IF_POINTER_NULL(strUltrasonicStruct);
+		cObjectPtr<IMediaType> pTypeUsStruct = new cMediaType(0, 0, 0, "tUltrasonicStruct", strUltrasonicStruct, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+		RETURN_IF_FAILED(pTypeUsStruct->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionUsStruct));
+		RETURN_IF_FAILED(m_oInputUsStruct.Create("UsStruct", pTypeUsStruct, static_cast<IPinEventSink*> (this)));
+		RETURN_IF_FAILED(RegisterPin(&m_oInputUsStruct));
+
 		//create pin for steering signal output
 		RETURN_IF_FAILED(pTypeSignalValue->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionOutputSteering));
         RETURN_IF_FAILED(m_oOutputSteering.Create("Steering", pTypeSignalValue, static_cast<IPinEventSink*> (this)));
@@ -150,6 +183,14 @@ tResult cLaneChange::Init(tInitStage eStage, __exception)
 		m_bStart= tFalse;
 		m_iStateOfLaneChange=SOLG_NOSTART;
 
+		// init US struct
+		m_szIdsUsStructSet=tFalse;
+		
+		for(int i=0;i<=10;i++)
+		{
+			m_aUSSensors[i]=400;
+		}
+
 		// init output signals
 		m_bFinishFlag=tFalse;
 		m_bTurnSignalLeftEnabled=tFalse;
@@ -189,17 +230,35 @@ tResult cLaneChange::PropertyChanged(const char* strProperty)
 		
 tResult cLaneChange::ReadProperties(const tChar* strPropertyName)
 {
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_DISTANCE))
+	//debug
+	m_bDebugModeEnabled = GetPropertyBool("Debug Output to Console");
+
+	// lane change part1
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_DISTANCE1))
 	{
-		m_fPropDist = static_cast<tFloat32> (GetPropertyFloat(PROP_DISTANCE));
+		m_fPropDist1 = static_cast<tFloat32> (GetPropertyFloat(PROP_DISTANCE1));
 	}
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_SPEED))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_SPEED1))
 	{
-		m_fPropSpeed = static_cast<tFloat32> (GetPropertyFloat(PROP_SPEED));
+		m_fPropSpeed1 = static_cast<tFloat32> (GetPropertyFloat(PROP_SPEED1));
 	}
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_STEER))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_STEER1))
 	{
-		m_fPropSteer = static_cast<tFloat32> (GetPropertyFloat(PROP_STEER));
+		m_fPropSteer1 = static_cast<tFloat32> (GetPropertyFloat(PROP_STEER1));
+	}
+
+	// lane change part2
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_DISTANCE2))
+	{
+		m_fPropDist2 = static_cast<tFloat32> (GetPropertyFloat(PROP_DISTANCE2));
+	}
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_SPEED2))
+	{
+		m_fPropSpeed2 = static_cast<tFloat32> (GetPropertyFloat(PROP_SPEED2));
+	}
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_STEER2))
+	{
+		m_fPropSteer2 = static_cast<tFloat32> (GetPropertyFloat(PROP_STEER2));
 	}
 	RETURN_NOERROR;
 }
@@ -231,6 +290,9 @@ tResult cLaneChange::OnPinEvent(IPin* pSource,
 				m_iStateOfLaneChange=SOLG_NOSTART;
 				m_bTurnSignalLeftEnabled=tFalse;
 				m_bTurnSignalRightEnabled=tFalse;
+				m_fSteeringOutput=0;
+				m_fSpeedOutput=0;
+				TransmitOutput();
 			}
 		}
 
@@ -252,8 +314,13 @@ tResult cLaneChange::OnPinEvent(IPin* pSource,
 
 		}
 
+		else if(pSource == &m_oInputUsStruct)
+        {
+            ProcessInputUS(pMediaSample);
+        }
+
 		// Input signal at Distance Overall
-		if (pSource == &m_oDistanceOverall)
+		else if (pSource == &m_oDistanceOverall)
 		{
 			//LOG_INFO("Vinoth distance info");
 			cObjectPtr<IMediaCoder> pCoderInput;
@@ -262,7 +329,10 @@ tResult cLaneChange::OnPinEvent(IPin* pSource,
 			pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
 			m_pDescdistanceoverall->Unlock(pCoderInput);
 
-			ProcessManeuver();
+			if(m_bStart)
+			{
+				ProcessManeuver();
+			}
 		}
 
     }
@@ -292,7 +362,7 @@ tResult cLaneChange::ProcessManeuver()
 			TurnLeft();
 
 			// after prop_dist change state
-			if (m_fDistanceOverall-m_fDistStart > m_fPropDist)
+			if (m_fDistanceOverall-m_fDistStart > m_fPropDist1)
 			{
 				m_iStateOfLaneChange=SOLG_CHANGELANE2;
 				m_fDistStart = m_fDistanceOverall;
@@ -304,29 +374,80 @@ tResult cLaneChange::ProcessManeuver()
 			TurnRight();
 
 			// after prop_dist change state
-			if (m_fDistanceOverall-m_fDistStart > m_fPropDist)
+			if (m_fDistanceOverall-m_fDistStart > m_fPropDist2)
 			{
-				m_iStateOfLaneChange=SOLG_WRONGLANE;
+				m_iStateOfLaneChange=SOLG_WRONGLANE_CHECK_FR;
 				m_fDistStart = m_fDistanceOverall;
 			}
 			break;
 		}
+	// check front right USsensor if it's free
+	case SOLG_WRONGLANE_CHECK_FR:
+		{
+			// output = input of lane follower
+			m_fSteeringOutput=0;
+			m_fSpeedOutput=-15;
+
+			m_bTurnSignalLeftEnabled=tFalse;
+
+			if(m_bDebugModeEnabled) LOG_INFO(cString::Format("lane change state %i  dist %f", m_iStateOfLaneChange,m_aUSSensors[US_FRONTRIGHT]));
+
+			// change state
+			if ((m_aUSSensors[US_FRONTRIGHT]>100) && (m_fDistanceOverall-m_fDistStart>0.3))
+			{
+				m_iStateOfLaneChange=SOLG_WRONGLANE_CHECK_R;
+				m_fDistStart = m_fDistanceOverall;
+			}
+
+			break;
+		}
+	// check right side USsensor if it's free
+	case SOLG_WRONGLANE_CHECK_R:
+		{
+			// output = input of lane follower
+			m_fSteeringOutput=0;
+			m_fSpeedOutput=-15;
+
+			if(m_bDebugModeEnabled) LOG_INFO(cString::Format("lane change state %i  dist %f", m_iStateOfLaneChange,m_aUSSensors[US_SIDERIGHT]));
+
+			// change state
+			if ((m_aUSSensors[US_SIDERIGHT]>100) && (m_fDistanceOverall-m_fDistStart>0.3))
+			{
+				m_iStateOfLaneChange=SOLG_WRONGLANE_CHECK_RR;
+				m_fDistStart = m_fDistanceOverall;
+			}
+
+			break;
+		}
+	// check right rear USsensor if it's free
+	case SOLG_WRONGLANE_CHECK_RR:
+		{
+			// output = input of lane follower
+			m_fSteeringOutput=0;
+			m_fSpeedOutput=-15;
+
+			// change state
+			if ((m_fDistanceOverall-m_fDistStart>0.3))
+			{
+				m_iStateOfLaneChange=SOLG_CHANGEBACK1;
+				m_fDistStart = m_fDistanceOverall;
+			}
+			// check in the next 30 cm if the right side is free
+			else
+			{
+				if(m_aUSSensors[US_SIDERIGHT]<100)
+					{
+						m_fDistStart=m_fDistanceOverall;
+					}
+			}
+			break;
+		}
+
+/*
 	case SOLG_WRONGLANE:
 		{
-			/*
-
-			TO BE CHANGED
-
-			speed_out = speed_in of lane follower
-
-			steer_out = steer_in of lane follower
-
-			Change back by signal or by USstruct
-
-			*/
-
 			m_fSteeringOutput=0;
-			m_fSpeedOutput=-10;
+			m_fSpeedOutput=-15;
 
 			m_bTurnSignalLeftEnabled=tFalse;
 
@@ -341,12 +462,13 @@ tResult cLaneChange::ProcessManeuver()
 
 			break;
 		}
+*/
 	case SOLG_CHANGEBACK1:
 		{
-			TurnRight();
+			TurnRightBack();
 
 			// after prop_dist change state
-			if (m_fDistanceOverall-m_fDistStart > m_fPropDist)
+			if (m_fDistanceOverall-m_fDistStart > m_fPropDist1)
 			{
 				m_iStateOfLaneChange=SOLG_CHANGEBACK2;
 				m_fDistStart = m_fDistanceOverall;
@@ -355,10 +477,10 @@ tResult cLaneChange::ProcessManeuver()
 		}
 	case SOLG_CHANGEBACK2:
 		{
-			TurnLeft();
+			TurnLeftBack();
 
 			// after prop_dist change state
-			if (m_fDistanceOverall-m_fDistStart > m_fPropDist)
+			if (m_fDistanceOverall-m_fDistStart > m_fPropDist2)
 			{
 				m_iStateOfLaneChange=SOLG_FINISH;
 				m_fDistStart = m_fDistanceOverall;
@@ -394,18 +516,121 @@ tResult cLaneChange::ProcessManeuver()
 
 tResult cLaneChange::TurnRight()
 {
-	m_fSteeringOutput=m_fPropSteer;
-	m_fSpeedOutput=(-1)*m_fPropSpeed;
+	m_fSteeringOutput=m_fPropSteer1;
+	m_fSpeedOutput=(-1)*m_fPropSpeed1;
 	RETURN_NOERROR;
 }
 
 
 tResult cLaneChange::TurnLeft()
 {
-	m_fSteeringOutput=(-1)*m_fPropSteer;
-	m_fSpeedOutput=(-1)*m_fPropSpeed;
+	m_fSteeringOutput=(-1)*m_fPropSteer1;
+	m_fSpeedOutput=(-1)*m_fPropSpeed1;
 	RETURN_NOERROR;
 }
+
+tResult cLaneChange::TurnRightBack()
+{
+	m_fSteeringOutput=m_fPropSteer2;
+	m_fSpeedOutput=(-1)*m_fPropSpeed2;
+	RETURN_NOERROR;
+}
+
+
+tResult cLaneChange::TurnLeftBack()
+{
+	m_fSteeringOutput=(-1)*m_fPropSteer2;
+	m_fSpeedOutput=(-1)*m_fPropSpeed2;
+	RETURN_NOERROR;
+}
+
+
+tResult cLaneChange::ProcessInputUS(IMediaSample* pMediaSample)
+{
+	// use mutex to access min US value
+	__synchronized_obj(m_critSecMinimumUsValue);
+
+    //read out incoming Media Samples
+    __adtf_sample_read_lock_mediadescription(m_pDescriptionUsStruct, pMediaSample, pCoderInput);
+
+    if(!m_szIdsUsStructSet)
+    {
+        tBufferID idValue, idTimestamp;
+        m_szIdUsStructValues.clear();
+        m_szIdUsStructTss.clear();
+		
+	pCoderInput->GetID("tFrontLeft.f32Value", idValue);
+	pCoderInput->GetID("tFrontLeft.ui32ArduinoTimestamp", idTimestamp);
+	m_szIdUsStructValues.push_back(idValue);
+	m_szIdUsStructTss.push_back(idTimestamp);
+
+	pCoderInput->GetID("tFrontCenterLeft.f32Value", idValue);
+	pCoderInput->GetID("tFrontCenterLeft.ui32ArduinoTimestamp", idTimestamp);
+	m_szIdUsStructValues.push_back(idValue);
+	m_szIdUsStructTss.push_back(idTimestamp);
+
+	pCoderInput->GetID("tFrontCenter.f32Value", idValue);
+	pCoderInput->GetID("tFrontCenter.ui32ArduinoTimestamp", idTimestamp);
+	m_szIdUsStructValues.push_back(idValue);
+	m_szIdUsStructTss.push_back(idTimestamp);
+
+        pCoderInput->GetID("tFrontCenterRight.f32Value", idValue);
+        pCoderInput->GetID("tFrontCenterRight.ui32ArduinoTimestamp", idTimestamp);
+        m_szIdUsStructValues.push_back(idValue);
+        m_szIdUsStructTss.push_back(idTimestamp);
+
+        pCoderInput->GetID("tFrontRight.f32Value", idValue);
+        pCoderInput->GetID("tFrontRight.ui32ArduinoTimestamp", idTimestamp);
+        m_szIdUsStructValues.push_back(idValue);
+        m_szIdUsStructTss.push_back(idTimestamp);
+
+        pCoderInput->GetID("tSideRight.f32Value", idValue);
+        pCoderInput->GetID("tSideRight.ui32ArduinoTimestamp", idTimestamp);
+        m_szIdUsStructValues.push_back(idValue);
+        m_szIdUsStructTss.push_back(idTimestamp);
+
+        pCoderInput->GetID("tSideLeft.f32Value", idValue);
+        pCoderInput->GetID("tSideLeft.ui32ArduinoTimestamp", idTimestamp);
+        m_szIdUsStructValues.push_back(idValue);
+        m_szIdUsStructTss.push_back(idTimestamp);
+
+        pCoderInput->GetID("tRearLeft.f32Value", idValue);
+        pCoderInput->GetID("tRearLeft.ui32ArduinoTimestamp", idTimestamp);
+        m_szIdUsStructValues.push_back(idValue);
+        m_szIdUsStructTss.push_back(idTimestamp);
+
+        pCoderInput->GetID("tRearCenter.f32Value", idValue);
+        pCoderInput->GetID("tRearCenter.ui32ArduinoTimestamp", idTimestamp);
+        m_szIdUsStructValues.push_back(idValue);
+        m_szIdUsStructTss.push_back(idTimestamp);
+
+        pCoderInput->GetID("tRearRight.f32Value", idValue);
+        pCoderInput->GetID("tRearRight.ui32ArduinoTimestamp", idTimestamp);
+        m_szIdUsStructValues.push_back(idValue);
+        m_szIdUsStructTss.push_back(idTimestamp);
+
+		// m_szIdsUsStructSet = tTrue;
+		m_szIdsUsStructSet = tTrue;
+
+        }
+	
+	// iterate through all values and save them in m_aUSSensors
+	for (int i=0;i<10;++i)
+	{	
+		tFloat32 buffer=-1;
+		pCoderInput->Get(m_szIdUsStructValues[i],(tVoid*)&buffer);
+		// Wrong Us-values are  0 or -1
+		if (buffer>0)
+		{
+			pCoderInput->Get(m_szIdUsStructValues[i],(tVoid*)&buffer);
+			m_aUSSensors[i]=buffer;
+			//if(m_bDebugModeEnabled) LOG_INFO(cString::Format("buffer %f", buffer));
+		}
+	}
+	RETURN_NOERROR;
+}
+
+
 
 tResult cLaneChange::TransmitOutput()
 {
@@ -489,3 +714,4 @@ tResult cLaneChange::TransmitOutput()
 
 	RETURN_NOERROR;
 }
+
