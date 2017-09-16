@@ -7,8 +7,8 @@ set(FILTER_NAME user_lpf_us)
 adtf_add_filter(${FILTER_NAME}          
     stdafx.h            
     stdafx.cpp            
-    lpf_us.h            
-    lpf_us.cpp
+    lpfus.h            
+    lpfus.cpp
 )
 
 adtf_install_plugin(${FILTER_NAME} ${CMAKE_INSTALL_BINARY})
