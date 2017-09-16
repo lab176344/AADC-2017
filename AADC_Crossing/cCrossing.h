@@ -99,6 +99,10 @@ protected:
 	cInputPin m_oStopLine;
 	cObjectPtr<IMediaTypeDescription> m_pDescStopLine;
 
+	// Infos about Edges
+	cInputPin m_oEdges;
+	cObjectPtr<IMediaTypeDescription> m_pDescEdges;
+
 	// critical section for current traffic sign
 	cCriticalSection m_critSecCurrentTrafficSign;
 
@@ -141,6 +145,12 @@ protected:
 	tFloat32 m_fDist2StopLine;
 	tFloat32 m_fOrientation2StopLine;
 	tBool m_bFlagNoStopLine;
+
+	// infos about edges
+	tBool m_bEdge1;
+	tFloat32 m_fDistEdge1;
+	tBool m_bEdge2;
+	tFloat32 m_fDistEdge2;
 
 	/* DEBUG */
 
@@ -252,7 +262,7 @@ protected:
 
 	tResult TurnRight(tBool bHaveToStop);
 	tResult TurnLeft(tBool bHaveToStop);
-	tResult GoStraight();
+	tResult GoStraight(tBool bHaveToStop);
 
 	tResult ReadProperties(const tChar* strPropertyName);
 
@@ -263,7 +273,8 @@ protected:
 		// Properties
 		tFloat32    propDist2Stopline, propDistRightTurn, propDistLeftTurn, propDistStraight, propDistGoStraightAfterTurn;
 		tFloat32    propSteerRight, propSteerLeft;
-		tFloat32    speed_st1,speed_st2;
+		tFloat32    speed2stopline,speed_curve, speed_straight;
+		tFloat32	propKpSteering;
 };
 
 //*************************************************************************************************

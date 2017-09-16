@@ -28,8 +28,11 @@ THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR
 #define STEER_RIGHT 			"cCrossing::steerright"
 #define STEER_LEFT				"cCrossing::steerleft"
 
-#define SPEED_TRAJ1			 	"cCrossing::st1_speed"
-#define SPEED_TRAJ3			 	"cCrossing::st2_speed"
+#define SPEED2STOPLINE			"cCrossing::speed2stopline"
+#define SPEEDCURVE		 		"cCrossing::speedcurve"
+#define SPEEDSTRAIGHT		 	"cCrossing::speedstraight"
+
+#define KPSTEERING				"cCrossing::kpsteering"
 
 /// Create filter shell
 ADTF_FILTER_PLUGIN("Crossing", OID_ADTF_CROSSING_FILTER, cCrossing);
@@ -44,11 +47,11 @@ cCrossing::cCrossing(const tChar* __info):cFilter(__info)
     SetPropertyBool(DISTANCE2STOPLINE NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(DISTANCE2STOPLINE NSSUBPROP_DESCRIPTION, "max. distance until stop line");
 
-	SetPropertyFloat(DISTANCERIGHTTURN,20);
+	SetPropertyFloat(DISTANCERIGHTTURN,50);
     SetPropertyBool(DISTANCERIGHTTURN NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(DISTANCERIGHTTURN NSSUBPROP_DESCRIPTION, "max. distance for right turn");
 
-	SetPropertyFloat(DISTANCELEFTTURN,20);
+	SetPropertyFloat(DISTANCELEFTTURN,110);
     SetPropertyBool(DISTANCELEFTTURN NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(DISTANCELEFTTURN NSSUBPROP_DESCRIPTION, "max. distance for left turn");
 
@@ -64,19 +67,25 @@ cCrossing::cCrossing(const tChar* __info):cFilter(__info)
     SetPropertyBool(STEER_RIGHT NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(STEER_RIGHT NSSUBPROP_DESCRIPTION, "steering for right turn");
 
-	SetPropertyFloat(STEER_LEFT,90);
+	SetPropertyFloat(STEER_LEFT,-60);
     SetPropertyBool(STEER_LEFT NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(STEER_LEFT NSSUBPROP_DESCRIPTION, "steering for left turn");
 
+	SetPropertyFloat(SPEED2STOPLINE,-15);
+    SetPropertyBool(SPEED2STOPLINE NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(SPEED2STOPLINE NSSUBPROP_DESCRIPTION, "the speed for going to stop line");
 
+	SetPropertyFloat(KPSTEERING,20);
+    SetPropertyBool(KPSTEERING NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(KPSTEERING NSSUBPROP_DESCRIPTION, "Kp value for steering control until stop line");
 
-	SetPropertyFloat(SPEED_TRAJ1,-15);
-    SetPropertyBool(SPEED_TRAJ1 NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(SPEED_TRAJ1 NSSUBPROP_DESCRIPTION, "the speed for the 1st trajectory");
+	SetPropertyFloat(SPEEDCURVE,-20);
+    SetPropertyBool(SPEEDCURVE NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(SPEEDCURVE NSSUBPROP_DESCRIPTION, "the speed for curve (left and right)");
 
-	SetPropertyFloat(SPEED_TRAJ3,-15);
-    SetPropertyBool(SPEED_TRAJ3 NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(SPEED_TRAJ3 NSSUBPROP_DESCRIPTION, "the speed for the straight after taking curve trajectory");
+	SetPropertyFloat(SPEEDSTRAIGHT,-20);
+    SetPropertyBool(SPEEDSTRAIGHT NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(SPEEDSTRAIGHT NSSUBPROP_DESCRIPTION, "the speed for going straight");
 
 }
 
@@ -141,9 +150,17 @@ tResult cCrossing::Init(tInitStage eStage, __exception)
 		RETURN_IF_FAILED(m_oStopLine.Create("StopLine", pTypeSignalStopLine, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oStopLine));
 
+		// create pin for Infos about Edges
+		tChar const * strDescEdges = pDescManager->GetMediaDescription("tEdgeStruct");
+		RETURN_IF_POINTER_NULL(strDescEdges);
+		cObjectPtr<IMediaType> pTypeSignalEdges = new cMediaType(0, 0, 0, "tEdgeStruct", strDescEdges, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+		RETURN_IF_FAILED(pTypeSignalEdges->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescEdges));
+		RETURN_IF_FAILED(m_oEdges.Create("Edges", pTypeSignalEdges, static_cast<IPinEventSink*> (this)));
+		RETURN_IF_FAILED(RegisterPin(&m_oEdges));
+
 
 		/*
-		// creeate pin for start signal
+		// create pin for start signal
 		tChar const * strDescSignalstart = pDescManager->GetMediaDescription("tBoolSignalValue");
 		RETURN_IF_POINTER_NULL(strDescSignalstart);
 		cObjectPtr<IMediaType> pTypeSignalstart = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalstart, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
@@ -271,10 +288,6 @@ tResult cCrossing::PropertyChanged(const char* strProperty)
 }
 		
 tResult cCrossing::ReadProperties(const tChar* strPropertyName)
-	#define DISTANCE2STOPLINE		"cCrossing::distance2stopline"
-#define DISTANCERIGHTTURN		"cCrossing::distancerightturn"
-#define DISTANCELEFTTURN		"cCrossing::distanceleftturn"
-#define DISTANCESTRAIGHT		"cCrossing::distancestraight"
 {
 	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, DISTANCE2STOPLINE))
 	{
@@ -304,16 +317,21 @@ tResult cCrossing::ReadProperties(const tChar* strPropertyName)
 	{
 		propSteerLeft = static_cast<tFloat32> (GetPropertyFloat(STEER_LEFT));
 	}
-
-
-
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, SPEED_TRAJ1))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, SPEED2STOPLINE))
 	{
-		speed_st1 = static_cast<tFloat32> (GetPropertyFloat(SPEED_TRAJ1));
+		speed2stopline = static_cast<tFloat32> (GetPropertyFloat(SPEED2STOPLINE));
 	}
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, SPEED_TRAJ3))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, KPSTEERING))
 	{
-		speed_st2 = static_cast<tFloat32> (GetPropertyFloat(SPEED_TRAJ3));
+		propKpSteering = static_cast<tFloat32> (GetPropertyFloat(KPSTEERING));
+	}
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, SPEEDCURVE))
+	{
+		speed_curve = static_cast<tFloat32> (GetPropertyFloat(SPEEDCURVE));
+	}
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, SPEEDSTRAIGHT))
+	{
+		speed_straight = static_cast<tFloat32> (GetPropertyFloat(SPEEDSTRAIGHT));
 	}
 	RETURN_NOERROR;
 }
@@ -330,48 +348,6 @@ tResult cCrossing::OnPinEvent(IPin* pSource,
         // so we received a media sample, so this pointer better be valid.
         if (pMediaSample != NULL)
 	{
-
-		/*
-		// Input signal at Start
-		if (pSource == &m_oStart)
-		{
-			cObjectPtr<IMediaCoder> pCoderInput;
-			RETURN_IF_FAILED(m_pDescStart->Lock(pMediaSample, &pCoderInput));
-			pCoderInput->Get("bValue", (tVoid*)&m_bStart);
-			pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
-			m_pDescStart->Unlock(pCoderInput);
-
-			// stop signal
-			if(!m_bStart)
-			{
-
-				// reset
-				// init values
-			}
-		}
-
-		*/
-
-		/*
-
-		// Input signal at Traffic sign
-		if (pSource == &m_oInputTrafficSign)
-		{
-			__adtf_sample_read_lock_mediadescription(m_pDescriptionInputTrafficSign,pMediaSample,pCoderInput);
-			// get IDs
-			if(!m_bIDsRoadSignSet)
-			{
-				pCoderInput->GetID("i16Identifier",m_szIDRoadSignI16Identifier);
-				pCoderInput->GetID("f32Imagesize", m_szIDRoadSignF32Imagesize);
-				m_bIDsRoadSignSet = tTrue;
-			}
-
-			pCoderInput->Get("i16Identifier", (tVoid*)&m_iTrafficSignID);
-			pCoderInput->Get("f32Imagesize", (tVoid*)&m_fTrafficSignImageSize);
-		}
-
-		*/
-
 		if(pSource == &m_oSituationDetection)
 		{
 			cObjectPtr<IMediaCoder> pCoderInput;
@@ -427,6 +403,17 @@ tResult cCrossing::OnPinEvent(IPin* pSource,
 				m_bFlagNoStopLine=tTrue;
 			}
 		}
+		// infos about Edges
+		else if (pSource == &m_oEdges)
+		{
+			cObjectPtr<IMediaCoder> pCoderInput;
+			RETURN_IF_FAILED(m_pDescEdges->Lock(pMediaSample, &pCoderInput));
+			pCoderInput->Get("bValue1", (tVoid*)&m_bEdge1);
+			pCoderInput->Get("f32Distance1", (tVoid*)&m_fDistEdge1);
+			pCoderInput->Get("bValue2", (tVoid*)&m_bEdge2);
+			pCoderInput->Get("f32Distance2", (tVoid*)&m_fDistEdge2);
+			m_pDescEdges->Unlock(pCoderInput);
+		}
 
     }
     RETURN_NOERROR;
@@ -447,7 +434,7 @@ tResult cCrossing::ProcessManeuver()
 	// right before left
 	case MARKER_ID_UNMARKEDINTERSECTION:
 		{
-			Maneuver(m_iManeuverID, tTrue);
+			Maneuver(m_iManeuverID, tFalse);
 			break;
 		}
 	// give away
@@ -497,31 +484,6 @@ tResult cCrossing::ProcessManeuver()
 
 tResult cCrossing::Maneuver(tInt8 iID, tBool i_bHaveToStop)
 {
-	if(iID==-1)
-	{
-		RETURN_NOERROR;
-	}
-	else if(iID==0)
-	{
-		// turn left
-		TurnLeft(i_bHaveToStop);
-	}
-	else if(iID==1)
-	{
-		// go straight
-	}
-	else if(iID==2)
-	{
-		// turn right
-		TurnRight(i_bHaveToStop);
-	}
-	RETURN_NOERROR;
-}
-
-tResult cCrossing::TurnRight(tBool bHaveToStop)
-{
-	if(m_bDebugModeEnabled)LOG_INFO(cString::Format("Turn Right State of Turn %d", m_iStateOfTurn));
-
 	switch(m_iStateOfTurn)
 	{
 	case SOT_NOSTART:
@@ -552,7 +514,7 @@ tResult cCrossing::TurnRight(tBool bHaveToStop)
 			}
 			if(m_bDebugModeEnabled)LOG_INFO(cString::Format("Dist %f    diff %f", m_fDist2Go, (m_fDistanceOverall-m_fDistanceOverall_Start)));
 			//change state of turn if your [5 cm] before stop line
-			if (m_fDistanceOverall-m_fDistanceOverall_Start > m_fDist2Go-5)
+			if (m_fDistanceOverall-m_fDistanceOverall_Start > m_fDist2Go-10)
 			{
 				m_iStateOfTurn=SOT_WAIT;
 				stop_time = _clock->GetStreamTime();
@@ -560,20 +522,10 @@ tResult cCrossing::TurnRight(tBool bHaveToStop)
 			// stop line not reached --> continue going straight
 			else
 			{
+				// linear calculation of the steering by KP
+				m_fSteeringOutput=propKpSteering*(m_fOrientation2StopLine-90);
 
-				if(m_fOrientation2StopLine>95)
-				{
-					m_fSteeringOutput=-10;
-				}
-				else if(m_fOrientation2StopLine<85)
-				{
-					m_fSteeringOutput=+10;
-				}
-				else
-				{
-					m_fSteeringOutput=0;
-				}
-				m_fAccelerationOutput=speed_st1;
+				m_fAccelerationOutput=speed2stopline;
 			}
 			break;
 		}
@@ -582,7 +534,7 @@ tResult cCrossing::TurnRight(tBool bHaveToStop)
 			m_fSteeringOutput=0;
 			m_fAccelerationOutput=0;
 
-			if(bHaveToStop)
+			if(i_bHaveToStop)
 			{
 				// waittime on stopping line
 				if((_clock->GetStreamTime() - stop_time) > 3e6)
@@ -596,6 +548,42 @@ tResult cCrossing::TurnRight(tBool bHaveToStop)
 			}
 			break;
 		}
+	// all other states are different by left/straight/rigth
+	default:
+		{
+				if(iID==-1)
+				{
+					RETURN_NOERROR;
+				}
+				else if(iID==0)
+				{
+					// turn left
+					TurnLeft(i_bHaveToStop);
+				}
+				else if(iID==1)
+				{
+					// go straight
+					GoStraight(i_bHaveToStop);
+				}
+				else if(iID==2)
+				{
+					// turn right
+					TurnRight(i_bHaveToStop);
+				}
+				break;
+		}
+
+	}
+
+	RETURN_NOERROR;
+}
+
+tResult cCrossing::TurnRight(tBool bHaveToStop)
+{
+	if(m_bDebugModeEnabled)LOG_INFO(cString::Format("Turn Right State of Turn %d", m_iStateOfTurn));
+
+	switch(m_iStateOfTurn)
+	{
     case SOT_PRIORITYINTRAFFIC:
 		{
 			// Beachtung der Vorfahrtsregeln
@@ -612,7 +600,7 @@ tResult cCrossing::TurnRight(tBool bHaveToStop)
     case SOT_TURN:
 		{
 			m_fSteeringOutput=propSteerRight;
-			m_fAccelerationOutput=speed_st1;
+			m_fAccelerationOutput=speed_curve;
 
 			// calculate yaw angle border
 			tFloat32 yawangleborder=m_fYawAngleAtStart-90;
@@ -646,7 +634,7 @@ tResult cCrossing::TurnRight(tBool bHaveToStop)
     case SOT_GOSTRAIGHT:
 		{
 			m_fSteeringOutput=0;
-			m_fAccelerationOutput=speed_st1;
+			m_fAccelerationOutput=speed_straight;
 			if (m_fDistanceOverall-m_fDistanceOverall_Start > propDistGoStraightAfterTurn)
 			{
 				m_iStateOfTurn=SOT_FINISH;
@@ -669,6 +657,142 @@ tResult cCrossing::TurnRight(tBool bHaveToStop)
 }
 
 
+tResult cCrossing::TurnLeft(tBool bHaveToStop)
+{
+	if(m_bDebugModeEnabled)LOG_INFO(cString::Format("Turn Left State of Turn %d", m_iStateOfTurn));
+
+	switch(m_iStateOfTurn)
+	{
+    case SOT_PRIORITYINTRAFFIC:
+		{
+			// Beachtung der Vorfahrtsregeln
+
+			// tbd
+
+			// save start values
+			m_fDistanceOverall_Start=m_fDistanceOverall;
+			m_fYawAngleAtStart=m_fYawAngle;
+			// change state of turn
+			m_iStateOfTurn=SOT_TURN;
+			break;
+		}
+    case SOT_TURN:
+		{
+			m_fSteeringOutput=propSteerLeft;
+			m_fAccelerationOutput=speed_curve;
+
+			// calculate yaw angle border
+			tFloat32 yawangleborder=m_fYawAngleAtStart-90;
+			tBool FlagCrossedBorder=tFalse;
+			if(yawangleborder<0)
+			{
+				yawangleborder=yawangleborder+360;
+				FlagCrossedBorder=tTrue;
+			}
+
+			if(FlagCrossedBorder)
+			{
+				//if ((m_fDistanceOverall-m_fDistanceOverall_Start > propDistRightTurn)||((m_fYawAngle < yawangleborder)&&(m_fYawAngle>yawangleborder+2)))
+				if ((m_fDistanceOverall-m_fDistanceOverall_Start) > propDistLeftTurn)
+				{
+					m_iStateOfTurn=SOT_GOSTRAIGHT;
+					m_fDistanceOverall_Start=m_fDistanceOverall;
+				}
+			}
+			else
+			{
+				//if ((m_fDistanceOverall-m_fDistanceOverall_Start > propDistRightTurn)||(m_fYawAngle < yawangleborder))
+				if ((m_fDistanceOverall-m_fDistanceOverall_Start) > propDistLeftTurn)
+				{
+					m_iStateOfTurn=SOT_GOSTRAIGHT;
+					m_fDistanceOverall_Start=m_fDistanceOverall;
+				}
+			}
+			break;
+		}
+    case SOT_GOSTRAIGHT:
+		{
+			m_fSteeringOutput=0;
+			m_fAccelerationOutput=speed_straight;
+			if (m_fDistanceOverall-m_fDistanceOverall_Start > propDistGoStraightAfterTurn)
+			{
+				m_iStateOfTurn=SOT_FINISH;
+			}
+			break;
+		}
+    case SOT_FINISH:
+		{
+			m_fSteeringOutput=0;
+			m_fAccelerationOutput=0;
+			//tbd
+			m_iStateOfTurn=SOT_NOSTART;
+			m_bFinishFlag=tTrue;
+			m_bStart=tFalse;
+			TransmitOutput();
+			break;
+		}
+	}	
+	RETURN_NOERROR;
+}
+
+
+tResult cCrossing::GoStraight(tBool bHaveToStop)
+{
+	if(m_bDebugModeEnabled)LOG_INFO(cString::Format("Go Straight State of Turn %d", m_iStateOfTurn));
+
+	switch(m_iStateOfTurn)
+	{
+    case SOT_PRIORITYINTRAFFIC:
+		{
+			// Beachtung der Vorfahrtsregeln
+
+			// tbd
+
+			// save start values
+			m_fDistanceOverall_Start=m_fDistanceOverall;
+			m_fYawAngleAtStart=m_fYawAngle;
+			// change state of turn
+			m_iStateOfTurn=SOT_TURN;
+			break;
+		}
+    case SOT_TURN:
+		{
+			m_fSteeringOutput=0;
+			m_fAccelerationOutput=speed_straight;
+			
+			if ((m_fDistanceOverall-m_fDistanceOverall_Start) > propDistStraight)
+			{
+				m_iStateOfTurn=SOT_GOSTRAIGHT;
+				m_fDistanceOverall_Start=m_fDistanceOverall;
+			}
+			break;
+		}
+    case SOT_GOSTRAIGHT:
+		{
+			m_fSteeringOutput=0;
+			m_fAccelerationOutput=speed_straight;
+			if (m_fDistanceOverall-m_fDistanceOverall_Start > propDistGoStraightAfterTurn)
+			{
+				m_iStateOfTurn=SOT_FINISH;
+			}
+			break;
+		}
+    case SOT_FINISH:
+		{
+			m_fSteeringOutput=0;
+			m_fAccelerationOutput=0;
+			//tbd
+			m_iStateOfTurn=SOT_NOSTART;
+			m_bFinishFlag=tTrue;
+			m_bStart=tFalse;
+			TransmitOutput();
+			break;
+		}
+	}	
+	RETURN_NOERROR;
+}
+
+/*
 tResult cCrossing::TurnLeft(tBool bHaveToStop)
 {
 	if(m_bDebugModeEnabled)LOG_INFO(cString::Format("Turn Left State of Turn %d", m_iStateOfTurn));
@@ -721,7 +845,7 @@ tResult cCrossing::TurnLeft(tBool bHaveToStop)
 				{
 					m_fSteeringOutput=0;
 				}
-				m_fAccelerationOutput=speed_st1;
+				m_fAccelerationOutput=speed2stopline;
 			}
 			break;
 		}
@@ -757,7 +881,7 @@ tResult cCrossing::TurnLeft(tBool bHaveToStop)
     case SOT_TURN:
 		{
 			m_fSteeringOutput=propSteerLeft;
-			m_fAccelerationOutput=speed_st2;
+			m_fAccelerationOutput=speed_curve;
 
 			if (m_fDistanceOverall-m_fDistanceOverall_Start > propDistLeftTurn)
 			{
@@ -769,7 +893,7 @@ tResult cCrossing::TurnLeft(tBool bHaveToStop)
     case SOT_GOSTRAIGHT:
 		{
 			m_fSteeringOutput=0;
-			m_fAccelerationOutput=speed_st2;
+			m_fAccelerationOutput=speed_straight;
 			if (m_fDistanceOverall-m_fDistanceOverall_Start > propDistGoStraightAfterTurn)
 			{
 				m_iStateOfTurn=SOT_FINISH;
@@ -790,6 +914,7 @@ tResult cCrossing::TurnLeft(tBool bHaveToStop)
 	}	
 	RETURN_NOERROR;
 }
+*/
 
 tResult cCrossing::TransmitOutput()
 {
