@@ -3,7 +3,11 @@
 	<settings>
 		<mode>linear</mode>
 	</settings>
-	<supportingPoints>	
+	<supportingPoints>
+		<point>
+			<xValue>-1,5</xValue>
+			<yValue>40</yValue>
+		</point>
 		<point>
 			<xValue>-0,75</xValue>
 			<yValue>20</yValue>
