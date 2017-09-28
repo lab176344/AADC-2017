@@ -13,9 +13,8 @@ THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR
 
 
 **********************************************************************
-* $Author:: spiesra $  $Date:: 2017-05-12 09:34:53#$ $Rev:: 63109   $
+* $Author:: spiesra $  $Date:: 2017-05-22 15:15:31#$ $Rev:: 63721   $
 **********************************************************************/
-
 #include "stdafx.h"
 #include "cCrossing.h"
 
@@ -34,20 +33,37 @@ THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR
 
 #define KPSTEERING				"cCrossing::kpsteering"
 
-/// Create filter shell
-ADTF_FILTER_PLUGIN("Crossing", OID_ADTF_CROSSING_FILTER, cCrossing);
+// define the ADTF property names to avoid errors
+ADTF_FILTER_PLUGIN(ADTF_FILTER_DESC,
+                   OID_ADTF_FILTER_DEF,
+                   cCrossing)
 
-using namespace roadsignIDs;
 
-cCrossing::cCrossing(const tChar* __info):cFilter(__info)
+
+cCrossing::cCrossing(const tChar* __info) : cFilter(__info)
 {
 	SetPropertyBool("Debug Output to Console",true);
+
+    SetPropertyInt("thresholdvalue", 150);
+    SetPropertyBool("thresholdvalue" NSSUBPROP_ISCHANGEABLE, tTrue);
+    SetPropertyBool("imshow", tFalse);
+    SetPropertyBool("imshow" NSSUBPROP_ISCHANGEABLE, tTrue);
+    SetPropertyInt("houghlines", 28);
+    SetPropertyBool("houghlines" NSSUBPROP_ISCHANGEABLE, tTrue);
+    SetPropertyInt("row1", 520);
+    SetPropertyBool("row1" NSSUBPROP_ISCHANGEABLE, tTrue);
+    SetPropertyInt("row2", 600);
+    SetPropertyBool("row2" NSSUBPROP_ISCHANGEABLE, tTrue);
+    SetPropertyInt("col1", 491);
+    SetPropertyBool("col1" NSSUBPROP_ISCHANGEABLE, tTrue);
+    SetPropertyInt("col2", 763);
+    SetPropertyBool("col2" NSSUBPROP_ISCHANGEABLE, tTrue);
 
 	SetPropertyFloat(DISTANCE2STOPLINE,40);
     SetPropertyBool(DISTANCE2STOPLINE NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(DISTANCE2STOPLINE NSSUBPROP_DESCRIPTION, "max. distance until stop line");
 
-	SetPropertyFloat(DISTANCERIGHTTURN,50);
+	SetPropertyFloat(DISTANCERIGHTTURN,60);
     SetPropertyBool(DISTANCERIGHTTURN NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(DISTANCERIGHTTURN NSSUBPROP_DESCRIPTION, "max. distance for right turn");
 
@@ -55,7 +71,7 @@ cCrossing::cCrossing(const tChar* __info):cFilter(__info)
     SetPropertyBool(DISTANCELEFTTURN NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(DISTANCELEFTTURN NSSUBPROP_DESCRIPTION, "max. distance for left turn");
 
-	SetPropertyFloat(DISTANCESTRAIGHT,20);
+	SetPropertyFloat(DISTANCESTRAIGHT,30);
     SetPropertyBool(DISTANCESTRAIGHT NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(DISTANCESTRAIGHT NSSUBPROP_DESCRIPTION, "max. distance for going straight");
 
@@ -71,7 +87,7 @@ cCrossing::cCrossing(const tChar* __info):cFilter(__info)
     SetPropertyBool(STEER_LEFT NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(STEER_LEFT NSSUBPROP_DESCRIPTION, "steering for left turn");
 
-	SetPropertyFloat(SPEED2STOPLINE,-15);
+	SetPropertyFloat(SPEED2STOPLINE,0.3);
     SetPropertyBool(SPEED2STOPLINE NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(SPEED2STOPLINE NSSUBPROP_DESCRIPTION, "the speed for going to stop line");
 
@@ -79,11 +95,11 @@ cCrossing::cCrossing(const tChar* __info):cFilter(__info)
     SetPropertyBool(KPSTEERING NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(KPSTEERING NSSUBPROP_DESCRIPTION, "Kp value for steering control until stop line");
 
-	SetPropertyFloat(SPEEDCURVE,-20);
+	SetPropertyFloat(SPEEDCURVE,0.5);
     SetPropertyBool(SPEEDCURVE NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(SPEEDCURVE NSSUBPROP_DESCRIPTION, "the speed for curve (left and right)");
 
-	SetPropertyFloat(SPEEDSTRAIGHT,-20);
+	SetPropertyFloat(SPEEDSTRAIGHT,0.5);
     SetPropertyBool(SPEEDSTRAIGHT NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(SPEEDSTRAIGHT NSSUBPROP_DESCRIPTION, "the speed for going straight");
 
@@ -91,23 +107,34 @@ cCrossing::cCrossing(const tChar* __info):cFilter(__info)
 
 cCrossing::~cCrossing()
 {
-
 }
 
+tResult cCrossing::Start(__exception)
+{
+
+    return cFilter::Start(__exception_ptr);
+}
+
+tResult cCrossing::Stop(__exception)
+{
+    return cFilter::Stop(__exception_ptr);
+}
 tResult cCrossing::Init(tInitStage eStage, __exception)
 {
-    // never miss calling the parent implementation!!
-    RETURN_IF_FAILED(cFilter::Init(eStage, __exception_ptr))
+    RETURN_IF_FAILED(cFilter::Init(eStage, __exception_ptr));
 
-    // in StageFirst you can create and register your static pins.
     if (eStage == StageFirst)
     {
-		cObjectPtr<IMediaDescriptionManager> pDescManager;
-        RETURN_IF_FAILED(_runtime->GetObject(OID_ADTF_MEDIA_DESCRIPTION_MANAGER,IID_ADTF_MEDIA_DESCRIPTION_MANAGER,(tVoid**)&pDescManager,__exception_ptr));
+        cObjectPtr<IMediaDescriptionManager> pDescManager;
+        RETURN_IF_FAILED(_runtime->GetObject(OID_ADTF_MEDIA_DESCRIPTION_MANAGER, IID_ADTF_MEDIA_DESCRIPTION_MANAGER, (tVoid**)&pDescManager, __exception_ptr));
 
-        tChar const * strRoadSign = pDescManager->GetMediaDescription("tRoadSign");
-        RETURN_IF_POINTER_NULL(strRoadSign);
-        cObjectPtr<IMediaType> pTypeRoadSign = new cMediaType(0, 0, 0, "tRoadSign", strRoadSign, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+        // Video Input
+        RETURN_IF_FAILED(m_oVideoInputPin.Create("Video_Input", IPin::PD_Input, static_cast<IPinEventSink*>(this)));
+        RETURN_IF_FAILED(RegisterPin(&m_oVideoInputPin));
+
+        // Video output
+        RETURN_IF_FAILED(m_oVideoOutputPin.Create("Video_Output", IPin::PD_Output, static_cast<IPinEventSink*>(this)));
+        RETURN_IF_FAILED(RegisterPin(&m_oVideoOutputPin));
 
 		tChar const * strDescSignalValue = pDescManager->GetMediaDescription("tSignalValue");
         RETURN_IF_POINTER_NULL(strDescSignalValue);
@@ -125,6 +152,13 @@ tResult cCrossing::Init(tInitStage eStage, __exception)
 		RETURN_IF_FAILED(m_oDistanceOverall.Create("Distance_Overall", pTypeSignaldistanceoverall, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oDistanceOverall));
 
+		//create pin for Steering Input of LaneFollower
+		tChar const * strDescSignalSteeringOfLaneFollower = pDescManager->GetMediaDescription("tSignalValue");
+		RETURN_IF_POINTER_NULL(strDescSignalSteeringOfLaneFollower);
+		cObjectPtr<IMediaType> pTypeSignalSteeringOfLaneFollower = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalSteeringOfLaneFollower, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+		RETURN_IF_FAILED(pTypeSignalSteeringOfLaneFollower->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescSteeringOfLaneFollower));
+		RETURN_IF_FAILED(m_oSteeringOfLaneFollower.Create("Steering Input", pTypeSignalSteeringOfLaneFollower, static_cast<IPinEventSink*> (this)));
+		RETURN_IF_FAILED(RegisterPin(&m_oSteeringOfLaneFollower));
 
 		// create pin for signal from situation detection
 		tChar const * strDescSituationDetection = pDescManager->GetMediaDescription("tCrossingStruct");
@@ -150,30 +184,21 @@ tResult cCrossing::Init(tInitStage eStage, __exception)
 		RETURN_IF_FAILED(m_oStopLine.Create("StopLine", pTypeSignalStopLine, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oStopLine));
 
-		// create pin for Infos about Edges
-		tChar const * strDescEdges = pDescManager->GetMediaDescription("tEdgeStruct");
-		RETURN_IF_POINTER_NULL(strDescEdges);
-		cObjectPtr<IMediaType> pTypeSignalEdges = new cMediaType(0, 0, 0, "tEdgeStruct", strDescEdges, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
-		RETURN_IF_FAILED(pTypeSignalEdges->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescEdges));
-		RETURN_IF_FAILED(m_oEdges.Create("Edges", pTypeSignalEdges, static_cast<IPinEventSink*> (this)));
-		RETURN_IF_FAILED(RegisterPin(&m_oEdges));
+		// create pin for Infos about EdgeLine
+		tChar const * strDescEdgeLine = pDescManager->GetMediaDescription("tStoplineStruct");
+		RETURN_IF_POINTER_NULL(strDescEdgeLine);
+		cObjectPtr<IMediaType> pTypeSignalEdgeLine = new cMediaType(0, 0, 0, "tStoplineStruct", strDescEdgeLine, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+		RETURN_IF_FAILED(pTypeSignalEdgeLine->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescEdgeLine));
+		RETURN_IF_FAILED(m_oEdgeLine.Create("EdgeLine", pTypeSignalEdgeLine, static_cast<IPinEventSink*> (this)));
+		RETURN_IF_FAILED(RegisterPin(&m_oEdgeLine));
 
-
-		/*
-		// create pin for start signal
-		tChar const * strDescSignalstart = pDescManager->GetMediaDescription("tBoolSignalValue");
-		RETURN_IF_POINTER_NULL(strDescSignalstart);
-		cObjectPtr<IMediaType> pTypeSignalstart = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalstart, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
-		RETURN_IF_FAILED(pTypeSignalstart->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescStart));
-		RETURN_IF_FAILED(m_oStart.Create("Start", pTypeSignalstart, static_cast<IPinEventSink*> (this)));
-		RETURN_IF_FAILED(RegisterPin(&m_oStart));
-		
-		//create pin for traffic sign input
-		RETURN_IF_FAILED(pTypeRoadSign->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionInputTrafficSign));
-        RETURN_IF_FAILED(m_oInputTrafficSign.Create("TrafficSign", pTypeRoadSign, static_cast<IPinEventSink*> (this)));
-        RETURN_IF_FAILED(RegisterPin(&m_oInputTrafficSign));
-
-		*/
+		// create pin for Infos about EdgePoint
+		tChar const * strDescEdgePoint = pDescManager->GetMediaDescription("tEdgeStruct");
+		RETURN_IF_POINTER_NULL(strDescEdgePoint);
+		cObjectPtr<IMediaType> pTypeSignalEdgePoint = new cMediaType(0, 0, 0, "tEdgeStruct", strDescEdgePoint, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+		RETURN_IF_FAILED(pTypeSignalEdgePoint->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescEdgePoint));
+		RETURN_IF_FAILED(m_oEdgePoint.Create("EdgePoint", pTypeSignalEdgePoint, static_cast<IPinEventSink*> (this)));
+		RETURN_IF_FAILED(RegisterPin(&m_oEdgePoint));
 
 		//create pin for steering signal output
 		RETURN_IF_FAILED(pTypeSignalValue->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionOutputSteering));
@@ -211,25 +236,41 @@ tResult cCrossing::Init(tInitStage eStage, __exception)
 		RETURN_IF_FAILED(pTypeSignalfinishflag->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescFinishFlag));
 		RETURN_IF_FAILED(m_oOutputFinishFlag.Create("FinishFlag", pTypeSignalfinishflag, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oOutputFinishFlag));
+
     }
     else if (eStage == StageNormal)
     {
-        // In this stage you would do further initialisation and/or create your dynamic pins.
-        // Please take a look at the demo_dynamicpin example for further reference.
-
 		m_bDebugModeEnabled = GetPropertyBool("Debug Output to Console");
+		
+		firstFrame = tTrue;
+        imagecount = 0;
+
+		thresholdvalue = GetPropertyInt("thresholdvalue");
+        houghlinesvalue = GetPropertyInt("houghlines");
+        row1 = GetPropertyInt("row1");
+        row2 = GetPropertyInt("row2");
+        col1 = GetPropertyInt("col1");
+        col2 = GetPropertyInt("col2");
     }
+
     else if (eStage == StageGraphReady)
     {
-		/*
-        // no ids were set so far
-        m_bIDsRoadSignSet = tFalse;
-		//m_bIDsSterringSet = tFalse;
-		*/
+        // get the image format of the input video pin
+        cObjectPtr<IMediaType> pType;
+        RETURN_IF_FAILED(m_oVideoInputPin.GetMediaType(&pType));
+
+        cObjectPtr<IMediaTypeVideo> pTypeVideo;
+        RETURN_IF_FAILED(pType->GetInterface(IID_ADTF_MEDIA_TYPE_VIDEO, (tVoid**)&pTypeVideo));
+
+        // set the image format of the input video pin
+        // set the image format of the input video pin
+        if (IS_FAILED(UpdateInputImageFormat(pTypeVideo->GetFormat())))
+        {
+            LOG_ERROR("Invalid Input Format for this filter");
+        }
+
 
 		m_bStart= tFalse;
-
-		
 
 		// no ids were set so far
 
@@ -246,7 +287,9 @@ tResult cCrossing::Init(tInitStage eStage, __exception)
 		m_bFinished=tFalse;
 
 		m_bStopLineDetected=tFalse;
+		m_bEdgeLineDetected=tFalse;
 		m_bFlagNoStopLine=tFalse;
+		m_bFlagNoEdgeLine=tFalse;
 
 		// output signals
 		m_bTurnSignalLeftEnabled=tFalse;
@@ -259,25 +302,14 @@ tResult cCrossing::Init(tInitStage eStage, __exception)
     RETURN_NOERROR;
 }
 
-tResult cCrossing::Shutdown(tInitStage eStage, __exception)
-{
-    // In each stage clean up everything that you initiaized in the corresponding stage during Init.
-    // Pins are an exception:
-    // - The base class takes care of static pins that are members of this class.
-    // - Dynamic pins have to be cleaned up in the ReleasePins method, please see the demo_dynamicpin
-    //   example for further reference.
 
+
+tResult cCrossing::Shutdown(tInitStage eStage, ucom::IException** __exception_ptr)
+{
     if (eStage == StageGraphReady)
     {
     }
-    else if (eStage == StageNormal)
-    {
-    }
-    else if (eStage == StageFirst)
-    {
-    }
 
-    // call the base class implementation
     return cFilter::Shutdown(eStage, __exception_ptr);
 }
 
@@ -336,89 +368,246 @@ tResult cCrossing::ReadProperties(const tChar* strPropertyName)
 	RETURN_NOERROR;
 }
 
-tResult cCrossing::OnPinEvent(IPin* pSource,
-                                    tInt nEventCode,
-                                    tInt nParam1,
-                                    tInt nParam2,
-                                    IMediaSample* pMediaSample)
+tResult cCrossing::OnPinEvent(IPin* pSource, tInt nEventCode, tInt nParam1, tInt nParam2, IMediaSample* pMediaSample)
 {
-    // first check what kind of event it is
+
+    RETURN_IF_POINTER_NULL(pMediaSample);
+    RETURN_IF_POINTER_NULL(pSource);
     if (nEventCode == IPinEventSink::PE_MediaSampleReceived)
     {
         // so we received a media sample, so this pointer better be valid.
         if (pMediaSample != NULL)
-	{
-		if(pSource == &m_oSituationDetection)
 		{
-			cObjectPtr<IMediaCoder> pCoderInput;
-			RETURN_IF_FAILED(m_pDescSituationDetection->Lock(pMediaSample, &pCoderInput));
-			pCoderInput->Get("i8RoadSignID", (tVoid*)&m_iTrafficSignID);
-			pCoderInput->Get("i8CrossingManeuverID", (tVoid*)&m_iManeuverID);
-			pCoderInput->Get("bValue", (tVoid*)&m_bStart);
-			pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
-			m_pDescSituationDetection->Unlock(pCoderInput);
-		}
-
-		// Input signal at Distance Overall
-		else if (pSource == &m_oDistanceOverall)
-		{
-			cObjectPtr<IMediaCoder> pCoderInput;
-			RETURN_IF_FAILED(m_pDescdistanceoverall->Lock(pMediaSample, &pCoderInput));
-			pCoderInput->Get("f32Value", (tVoid*)&m_fDistanceOverall);
-			pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
-			m_pDescdistanceoverall->Unlock(pCoderInput);
-
-			// change from [m] to [cm]
-			m_fDistanceOverall=m_fDistanceOverall*100;
-
-			ProcessManeuver();
-		}
-		// Input signal at InerMeasUnit
-		else if (pSource == &m_oInerMeasUnit)
-		{
-			cObjectPtr<IMediaCoder> pCoderInput;
-			RETURN_IF_FAILED(m_pDescInerMeasUnit->Lock(pMediaSample, &pCoderInput));
-			pCoderInput->Get("f32Value", (tVoid*)&m_fYawAngle);
-			//pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
-			m_pDescInerMeasUnit->Unlock(pCoderInput);
-
-			// transform it from -180/+180 to 0/+360 coordinate
-			m_fYawAngle=m_fYawAngle+180;
-		}
-		// infos about StopLine
-		else if (pSource == &m_oStopLine)
-		{
-			cObjectPtr<IMediaCoder> pCoderInput;
-			RETURN_IF_FAILED(m_pDescStopLine->Lock(pMediaSample, &pCoderInput));
-			pCoderInput->Get("bValue", (tVoid*)&m_bStopLineDetected);
-			pCoderInput->Get("f32Distance", (tVoid*)&m_fDist2StopLine);
-			pCoderInput->Get("f32Orientation", (tVoid*)&m_fOrientation2StopLine);
-			m_pDescStopLine->Unlock(pCoderInput);
-
-			m_fDist2StopLine=m_fDist2StopLine;
-
-			// set flag if the stop line is not detected
-			if(!m_bStopLineDetected)
+			if (pSource == &m_oVideoInputPin)
 			{
-				m_bFlagNoStopLine=tTrue;
+				//check if video format is still unkown
+				if (m_sInputFormat.nPixelFormat == IImage::PF_UNKNOWN)
+				{
+					RETURN_IF_FAILED(UpdateInputImageFormat(m_oVideoInputPin.GetFormat()));
+				}
+				// only in state turn --> call function two lines detected
+				if(m_iStateOfTurn==SOT_TURN)
+				{
+					TwoLinesDetected(pMediaSample);
+				}
+			}
+
+			if(pSource == &m_oSituationDetection)
+			{
+				cObjectPtr<IMediaCoder> pCoderInput;
+				RETURN_IF_FAILED(m_pDescSituationDetection->Lock(pMediaSample, &pCoderInput));
+				pCoderInput->Get("i8RoadSignID", (tVoid*)&m_iTrafficSignID);
+				pCoderInput->Get("i8CrossingManeuverID", (tVoid*)&m_iManeuverID);
+				pCoderInput->Get("bValue", (tVoid*)&m_bStart);
+				pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+				m_pDescSituationDetection->Unlock(pCoderInput);
+			}
+
+			// Input signal at Distance Overall
+			else if (pSource == &m_oDistanceOverall)
+			{
+				cObjectPtr<IMediaCoder> pCoderInput;
+				RETURN_IF_FAILED(m_pDescdistanceoverall->Lock(pMediaSample, &pCoderInput));
+				pCoderInput->Get("f32Value", (tVoid*)&m_fDistanceOverall);
+				pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+				m_pDescdistanceoverall->Unlock(pCoderInput);
+
+				// change from [m] to [cm]
+				m_fDistanceOverall=m_fDistanceOverall*100;
+
+				ProcessManeuver();
+			}
+			// Input signal at SteeringIn of LaneFollower
+			else if (pSource == &m_oSteeringOfLaneFollower)
+			{
+				cObjectPtr<IMediaCoder> pCoderInput;
+				RETURN_IF_FAILED(m_pDescSteeringOfLaneFollower->Lock(pMediaSample, &pCoderInput));
+				pCoderInput->Get("f32Value", (tVoid*)&m_fInputSteeringOfLaneFollower);
+				pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+				m_pDescSteeringOfLaneFollower->Unlock(pCoderInput);
+			}
+			// Input signal at InerMeasUnit
+			else if (pSource == &m_oInerMeasUnit)
+			{
+				cObjectPtr<IMediaCoder> pCoderInput;
+				RETURN_IF_FAILED(m_pDescInerMeasUnit->Lock(pMediaSample, &pCoderInput));
+				pCoderInput->Get("f32Value", (tVoid*)&m_fYawAngle);
+				//pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+				m_pDescInerMeasUnit->Unlock(pCoderInput);
+
+				// transform it from -180/+180 to 0/+360 coordinate
+				m_fYawAngle=m_fYawAngle+180;
+			}
+			// infos about StopLine
+			else if (pSource == &m_oStopLine)
+			{
+				cObjectPtr<IMediaCoder> pCoderInput;
+				RETURN_IF_FAILED(m_pDescStopLine->Lock(pMediaSample, &pCoderInput));
+				pCoderInput->Get("bValue", (tVoid*)&m_bStopLineDetected);
+				pCoderInput->Get("f32Distance", (tVoid*)&m_fDist2StopLine);
+				pCoderInput->Get("f32Orientation", (tVoid*)&m_fOrientation2StopLine);
+				m_pDescStopLine->Unlock(pCoderInput);
+
+				// set flag if the stop line is not detected
+				if(!m_bStopLineDetected)
+				{
+					m_bFlagNoStopLine=tTrue;
+				}
+			}
+			// infos about EdgeLine
+			else if (pSource == &m_oEdgeLine)
+			{
+				cObjectPtr<IMediaCoder> pCoderInput;
+				RETURN_IF_FAILED(m_pDescEdgeLine->Lock(pMediaSample, &pCoderInput));
+				pCoderInput->Get("bValue", (tVoid*)&m_bEdgeLineDetected);
+				pCoderInput->Get("f32Distance", (tVoid*)&m_fDist2EdgeLine);
+				pCoderInput->Get("f32Orientation", (tVoid*)&m_fOrientation2EdgeLine);
+				m_pDescEdgeLine->Unlock(pCoderInput);
+
+				// set flag if the edge line is not detected
+				if(!m_bEdgeLineDetected)
+				{
+					m_bFlagNoEdgeLine=tTrue;
+				}
+			}
+			// infos about EdgePoint
+			else if (pSource == &m_oEdgePoint)
+			{
+				cObjectPtr<IMediaCoder> pCoderInput;
+				RETURN_IF_FAILED(m_pDescEdgePoint->Lock(pMediaSample, &pCoderInput));
+				pCoderInput->Get("bValue1", (tVoid*)&m_bEdge1);
+				pCoderInput->Get("f32Distance1", (tVoid*)&m_fDistEdge1);
+				//pCoderInput->Get("bValue2", (tVoid*)&m_bEdge2);
+				//pCoderInput->Get("f32Distance2", (tVoid*)&m_fDistEdge2);
+				m_pDescEdgePoint->Unlock(pCoderInput);
+			}
+
+
+		}
+		}
+		else if (nEventCode == IPinEventSink::PE_MediaTypeChanged)
+		{
+			if (pSource == &m_oVideoInputPin)
+			{
+				//the input format was changed, so the imageformat has to changed in this filter also
+				RETURN_IF_FAILED(UpdateInputImageFormat(m_oVideoInputPin.GetFormat()));
 			}
 		}
-		// infos about Edges
-		else if (pSource == &m_oEdges)
-		{
-			cObjectPtr<IMediaCoder> pCoderInput;
-			RETURN_IF_FAILED(m_pDescEdges->Lock(pMediaSample, &pCoderInput));
-			pCoderInput->Get("bValue1", (tVoid*)&m_bEdge1);
-			pCoderInput->Get("f32Distance1", (tVoid*)&m_fDistEdge1);
-			pCoderInput->Get("bValue2", (tVoid*)&m_bEdge2);
-			pCoderInput->Get("f32Distance2", (tVoid*)&m_fDistEdge2);
-			m_pDescEdges->Unlock(pCoderInput);
-		}
+		RETURN_NOERROR;
+}
 
+tResult cCrossing::TwoLinesDetected(IMediaSample* pSample)
+{
+	// VideoInput
+    RETURN_IF_POINTER_NULL(pSample);
+
+    cObjectPtr<IMediaSample> pNewRGBSample;
+
+    const tVoid* l_pSrcBuffer;
+
+    if (IS_OK(pSample->Lock(&l_pSrcBuffer)))
+    {
+
+        IplImage* img = cvCreateImageHeader(cvSize(m_sInputFormat.nWidth, m_sInputFormat.nHeight), IPL_DEPTH_8U, 3);
+        img->imageData = (char*)l_pSrcBuffer;
+        //Übergang von OpenCV1 auf OpenCV2
+        Mat image(cvarrToMat(img));
+        cvReleaseImage(&img);
+        pSample->Unlock(l_pSrcBuffer);
+        //Zuschneiden des Bildes
+	Mat imagecut,color_dst,imagecut2,imagecut3,imagecut4;
+              
+        imagecut = image(Range(row1, row2), Range(col1, col2)).clone(); //Range(200, 400), Range(99, 600)
+        
+	 
+        //Erzeugen eines Graustufenbildes
+	 GaussianBlur(imagecut,imagecut2,Size(13,13),0,0, BORDER_DEFAULT); 
+        cvtColor(imagecut2, grey, CV_BGR2GRAY);
+       
+       // adaptiveThreshold(imagecut2, greythresh, thresholdvalue, ADAPTIVE_THRESH_MEAN_C,THRESH_BINARY, 11, 12);
+        //Treshold um Binärbild zu erhalten
+       threshold(grey, greythresh, thresholdvalue, 500, THRESH_BINARY);
+        //namedWindow("Grey Threshold");
+        //imshow("Grey Threshold",greythresh);
+        //waitKey(1);
+        //Kantendedektion
+        //Canny(greythresh, linecanny, 250, 350);	
+	Canny(greythresh, linecanny, 0, 2, 3, tFalse);
+        cannysize = linecanny.size();
+        vector<Vec2f> lines;
+        HoughLines(linecanny, lines, 2, CV_PI / 180, houghlinesvalue, 0, 0);
+        cvtColor( linecanny, color_dst, CV_GRAY2BGR );
+
+        tFloat32 thetaAll[1000];
+        tFloat32 rhoAll[1000];
+        for (tInt i = 0; i < (tInt)(lines.size()); i++)
+        {
+            thetaAll[i] = lines[i][1];
+            rhoAll[i] = lines[i][0];
+        }
+
+        tFloat32 thetaNoRep[1000];
+        tFloat32 rhoNoRep[1000];
+        tInt sizeNoRep = 0;
+
+        for (tInt i = 0; i < (tInt)(lines.size()); i++)
+        {
+            tInt rep = 0;
+            for (tInt j = 0; j < i; j++)
+            {
+                if (abs(thetaAll[i] - thetaAll[j]) <= 0.2)
+                {
+                    rep = 1;		// Line is repeated, ignore this one
+                }
+            }
+			if ((rep == 0) && (( thetaAll[i]<CV_PI*0.36111) || (thetaAll[i]>CV_PI*0.63889))) //theta not between 72 and 108
+            {
+                thetaNoRep[sizeNoRep] = thetaAll[i];
+                rhoNoRep[sizeNoRep] = rhoAll[i];
+                sizeNoRep += 1;
+			}
+
+        }
+		// if two lines detected return true
+		if(sizeNoRep==2)
+		{
+			m_bTwoLinesDetected=tTrue;
+		}
+		else
+		{
+			m_bTwoLinesDetected= tFalse;
+		}
+	}
+	RETURN_NOERROR;
+}
+
+tResult cCrossing::UpdateInputImageFormat(const tBitmapFormat* pFormat)
+{
+    if (pFormat != NULL)
+    {
+        //update member variable
+        m_sInputFormat = (*pFormat);
+        //LOG_INFO(adtf_util::cString::Format("Input: Size %d x %d ; BPL %d ; Size %d , PixelFormat; %d", m_sInputFormat.nWidth, m_sInputFormat.nHeight, m_sInputFormat.nBytesPerLine, m_sInputFormat.nSize, m_sInputFormat.nPixelFormat));
+        //create the input matrix
+        RETURN_IF_FAILED(BmpFormat2Mat(m_sInputFormat, m_inputImage));
     }
     RETURN_NOERROR;
 }
+
+tResult cCrossing::UpdateOutputImageFormat(const cv::Mat& outputImage)
+{
+    //check if pixelformat or size has changed
+    if (tInt32(outputImage.total() * outputImage.elemSize()) != m_sOutputFormat.nSize)
+    {
+        Mat2BmpFormat(outputImage, m_sOutputFormat);
+
+        //LOG_INFO(adtf_util::cString::Format("Output: Size %d x %d ; BPL %d ; Size %d , PixelFormat; %d", m_sOutputFormat.nWidth, m_sOutputFormat.nHeight, m_sOutputFormat.nBytesPerLine, m_sOutputFormat.nSize, m_sOutputFormat.nPixelFormat));
+        //set output format for output pin
+        m_oVideoOutputPin.SetFormat(&m_sOutputFormat, NULL);
+    }
+    RETURN_NOERROR;
 }
+
 
 tResult cCrossing::ProcessManeuver()
 {
@@ -475,9 +664,9 @@ tResult cCrossing::ProcessManeuver()
 
 	}
 
-	//if(m_bStart){
+	if(m_bStart){
 		TransmitOutput();
-	//}
+	}
 
 	RETURN_NOERROR;
 }
@@ -493,6 +682,7 @@ tResult cCrossing::Maneuver(tInt8 iID, tBool i_bHaveToStop)
 			//reset finish flag
 			m_bFinishFlag=tFalse;
 			m_bFlagNoStopLine=tFalse;
+			m_bFlagNoEdgeLine=tFalse;
 			// change state of turn when StartSignal is true
 			if(m_bStart)
 			{
@@ -511,9 +701,40 @@ tResult cCrossing::Maneuver(tInt8 iID, tBool i_bHaveToStop)
 			{
 				m_fDist2Go=m_fDist2StopLine;
 				m_fDistanceOverall_Start=m_fDistanceOverall;
+				m_fOrientation2Go=m_fOrientation2StopLine;
 			}
-			if(m_bDebugModeEnabled)LOG_INFO(cString::Format("Dist %f    diff %f", m_fDist2Go, (m_fDistanceOverall-m_fDistanceOverall_Start)));
-			//change state of turn if your [5 cm] before stop line
+			// no stop line but EdgeLine
+			else if (!m_bFlagNoEdgeLine)
+			{
+				// minus [6 cm]
+				m_fDist2Go=m_fDist2EdgeLine-6;
+				m_fDistanceOverall_Start=m_fDistanceOverall;
+				m_fOrientation2Go=m_fOrientation2EdgeLine;
+
+				if(m_bDebugModeEnabled)LOG_INFO(cString::Format("EdgeLine dist %f ", m_fDist2EdgeLine));
+			}
+			/*
+			// only EdgePoint
+			else if(m_bEdge1)
+			{
+				// orientation tbd
+				//m_fOrientation2Go=m_fInputSteeringOfLaneFollower;
+
+				m_fOrientation2Go=90;
+
+				// dist edge minus [6 cm] (difference between edge1 and stopline)
+				m_fDist2Go=m_fDistEdge1-6;
+
+				if(m_bDebugModeEnabled)LOG_INFO(cString::Format("EDGE1 %i dist1 %f ", m_bEdge1, m_fDistEdge1));
+			}
+			*/
+			else
+			{
+				m_fOrientation2Go=90;
+			}
+
+			//if(m_bDebugModeEnabled)LOG_INFO(cString::Format("Dist %f    diff %f", m_fDist2Go, (m_fDistanceOverall-m_fDistanceOverall_Start)));
+			//change state of turn if your [10 cm] before stop line
 			if (m_fDistanceOverall-m_fDistanceOverall_Start > m_fDist2Go-10)
 			{
 				m_iStateOfTurn=SOT_WAIT;
@@ -523,7 +744,7 @@ tResult cCrossing::Maneuver(tInt8 iID, tBool i_bHaveToStop)
 			else
 			{
 				// linear calculation of the steering by KP
-				m_fSteeringOutput=propKpSteering*(m_fOrientation2StopLine-90);
+				m_fSteeringOutput=propKpSteering*(m_fOrientation2Go-90);
 
 				m_fAccelerationOutput=speed2stopline;
 			}
@@ -623,7 +844,7 @@ tResult cCrossing::TurnRight(tBool bHaveToStop)
 			else
 			{
 				//if ((m_fDistanceOverall-m_fDistanceOverall_Start > propDistRightTurn)||(m_fYawAngle < yawangleborder))
-				if ((m_fDistanceOverall-m_fDistanceOverall_Start) > propDistRightTurn)
+				if (m_bTwoLinesDetected && (m_fDistanceOverall-m_fDistanceOverall_Start) > propDistRightTurn)
 				{
 					m_iStateOfTurn=SOT_GOSTRAIGHT;
 					m_fDistanceOverall_Start=m_fDistanceOverall;
@@ -635,6 +856,7 @@ tResult cCrossing::TurnRight(tBool bHaveToStop)
 		{
 			m_fSteeringOutput=0;
 			m_fAccelerationOutput=speed_straight;
+			// call function two lines detected
 			if (m_fDistanceOverall-m_fDistanceOverall_Start > propDistGoStraightAfterTurn)
 			{
 				m_iStateOfTurn=SOT_FINISH;
@@ -693,7 +915,7 @@ tResult cCrossing::TurnLeft(tBool bHaveToStop)
 			if(FlagCrossedBorder)
 			{
 				//if ((m_fDistanceOverall-m_fDistanceOverall_Start > propDistRightTurn)||((m_fYawAngle < yawangleborder)&&(m_fYawAngle>yawangleborder+2)))
-				if ((m_fDistanceOverall-m_fDistanceOverall_Start) > propDistLeftTurn)
+				if (m_bTwoLinesDetected && (m_fDistanceOverall-m_fDistanceOverall_Start) > propDistLeftTurn)
 				{
 					m_iStateOfTurn=SOT_GOSTRAIGHT;
 					m_fDistanceOverall_Start=m_fDistanceOverall;
