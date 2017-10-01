@@ -21,8 +21,7 @@ THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR
 /// Create filter shell
 
 
-#define MAX_DIST		"cACC::max_dist"
-#define MAX_DIST_CURVE	"cACC::max_dist_curve"
+#define DIST_OVERTAKE		"cACC::dist_overtake"
 #define STEERING_SWITCH_US_FOCUS	"cACC::steering_switch_focus"
 #define STOP_TTC	"cACC::stop_ttc"
 #define REDUCE_SPEED_TTC	"cACC::reduce_speed_ttc"
@@ -35,13 +34,9 @@ cACC::cACC(const tChar* __info):cFilter(__info)
 {
 	SetPropertyBool("Debug Output to Console",true);
 
-	SetPropertyFloat(MAX_DIST,120);
-    SetPropertyBool(MAX_DIST NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(MAX_DIST NSSUBPROP_DESCRIPTION, "max dist to go straight");
-
-	SetPropertyFloat(MAX_DIST_CURVE,90);
-    SetPropertyBool(MAX_DIST_CURVE NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(MAX_DIST_CURVE NSSUBPROP_DESCRIPTION, "max dist in curves");
+	SetPropertyFloat(DIST_OVERTAKE,0.6);
+    SetPropertyBool(DIST_OVERTAKE NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(DIST_OVERTAKE NSSUBPROP_DESCRIPTION, "dist to start overtake");
 
 	SetPropertyFloat(STEERING_SWITCH_US_FOCUS,60);
     SetPropertyBool(STEERING_SWITCH_US_FOCUS NSSUBPROP_ISCHANGEABLE,tTrue);
@@ -215,13 +210,9 @@ tResult cACC::PropertyChanged(const char* strProperty)
 		
 tResult cACC::ReadProperties(const tChar* strPropertyName)
 {
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, MAX_DIST))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, DIST_OVERTAKE))
 	{
-		m_fMaxDist = static_cast<tFloat32> (GetPropertyFloat(MAX_DIST));
-	}
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, MAX_DIST_CURVE))
-	{
-		m_fMaxDistCurve = static_cast<tFloat32> (GetPropertyFloat(MAX_DIST_CURVE));
+		m_fDistOvertake = static_cast<tFloat32> (GetPropertyFloat(DIST_OVERTAKE));
 	}
 		if (NULL == strPropertyName || cString::IsEqual(strPropertyName, STEERING_SWITCH_US_FOCUS))
 	{
@@ -504,7 +495,7 @@ tResult cACC::CalculateSpeed()
 
 	// check if the speed is to slow or distance is to small
 	
-	if((fAverageDist < 0.6))
+	if((fAverageDist < m_fDistOvertake))
 	{
 		m_fAccelerationOutput=0;
 		m_fSteeringOutput=0;

@@ -236,7 +236,7 @@ protected:
 
 	private:
 		// properties
-		tFloat32    m_fMaxDist, m_fMaxDistCurve, m_fSteeringToSwitchFocus;
+		tFloat32    m_fDistOvertake, m_fSteeringToSwitchFocus;
 
 		tFloat m_fStopTTC, m_fReduceSpeedTTC;
 };
