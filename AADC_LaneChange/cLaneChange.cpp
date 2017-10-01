@@ -19,15 +19,27 @@ THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR
 #include "stdafx.h"
 #include "cLaneChange.h"
 
-// change part 1
-#define PROP_DISTANCE1	"cLaneChange::prop_dist1"
-#define PROP_SPEED1		"cLaneChange::prop_speed1"
-#define PROP_STEER1		"cLaneChange::prop_steer1"
+// change part 1 left
+#define PROP_DISTANCE_LEFT	"cLaneChange::prop_dist_left"
+#define PROP_SPEED_LEFT		"cLaneChange::prop_speed_left"
+#define PROP_STEER_LEFT		"cLaneChange::prop_steer_left"
 
-//change part 2
-#define PROP_DISTANCE2	"cLaneChange::prop_dist2"
-#define PROP_SPEED2		"cLaneChange::prop_speed2"
-#define PROP_STEER2		"cLaneChange::prop_steer2"
+//change part 2 right
+#define PROP_DISTANCE_RIGHT		"cLaneChange::prop_dist_right"
+#define PROP_SPEED_RIGHT		"cLaneChange::prop_speed_right"
+#define PROP_STEER_RIGHT		"cLaneChange::prop_steer_right"
+
+//change part 3 right back
+#define PROP_DISTANCE_RIGHT_BACK	"cLaneChange::prop_dist_right_back"
+#define PROP_SPEED_RIGHT_BACK		"cLaneChange::prop_speed_right_back"
+#define PROP_STEER_RIGHT_BACK		"cLaneChange::prop_steer_right_back"
+
+// change part 4 left back
+#define PROP_DISTANCE_LEFT_BACK		"cLaneChange::prop_dist_left_back"
+#define PROP_SPEED_LEFT_BACK		"cLaneChange::prop_speed_left_back"
+#define PROP_STEER_LEFT_BACK		"cLaneChange::prop_steer_left_back"
+
+#define PROP_SPEED_OVERTAKE		"cLaneChange::prop_speed_overtake"
 
 
 /// Create filter shell
@@ -40,31 +52,62 @@ cLaneChange::cLaneChange(const tChar* __info):cFilter(__info)
 	// debug
 	SetPropertyBool("Debug Output to Console",true);
 
-	// lane change
-	SetPropertyFloat(PROP_DISTANCE1,0.5);
-    SetPropertyBool(PROP_DISTANCE1 NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(PROP_DISTANCE1 NSSUBPROP_DESCRIPTION, "the distance for lane change 1");
+	// lane change left 1
+	SetPropertyFloat(PROP_DISTANCE_LEFT,0.7);
+    SetPropertyBool(PROP_DISTANCE_LEFT NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_DISTANCE_LEFT NSSUBPROP_DESCRIPTION, "the distance for lane change left 1");
 
-	SetPropertyFloat(PROP_SPEED1,15);
-    SetPropertyBool(PROP_SPEED1 NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(PROP_SPEED1 NSSUBPROP_DESCRIPTION, "the speed for lane change 1");
+	SetPropertyFloat(PROP_SPEED_LEFT,0.35);
+    SetPropertyBool(PROP_SPEED_LEFT NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_SPEED_LEFT NSSUBPROP_DESCRIPTION, "the speed for lane change left 1");
 
-	SetPropertyFloat(PROP_STEER1,80);
-    SetPropertyBool(PROP_STEER1 NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(PROP_STEER1 NSSUBPROP_DESCRIPTION, "the steer for lane change 1");
+	SetPropertyFloat(PROP_STEER_LEFT,90);
+    SetPropertyBool(PROP_STEER_LEFT NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_STEER_LEFT NSSUBPROP_DESCRIPTION, "the steer for lane change left 1");
 
-	//change back
-	SetPropertyFloat(PROP_DISTANCE2,0.6);
-    SetPropertyBool(PROP_DISTANCE2 NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(PROP_DISTANCE2 NSSUBPROP_DESCRIPTION, "the distance for lane change 2");
+	// lane change right 2
+	SetPropertyFloat(PROP_DISTANCE_RIGHT,0.6);
+    SetPropertyBool(PROP_DISTANCE_RIGHT NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_DISTANCE_RIGHT NSSUBPROP_DESCRIPTION, "the distance for lane change right 2");
 
-	SetPropertyFloat(PROP_SPEED2,15);
-    SetPropertyBool(PROP_SPEED2 NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(PROP_SPEED2 NSSUBPROP_DESCRIPTION, "the speed for lane change 2");
+	SetPropertyFloat(PROP_SPEED_RIGHT, 0.35);
+    SetPropertyBool(PROP_SPEED_RIGHT NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_SPEED_RIGHT NSSUBPROP_DESCRIPTION, "the speed for lane change right 2");
 
-	SetPropertyFloat(PROP_STEER2,80);
-    SetPropertyBool(PROP_STEER1 NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(PROP_STEER1 NSSUBPROP_DESCRIPTION, "the steer for lane change 2");
+	SetPropertyFloat(PROP_STEER_RIGHT,90);
+    SetPropertyBool(PROP_STEER_RIGHT NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_STEER_RIGHT NSSUBPROP_DESCRIPTION, "the steer for lane change right 2");
+
+	// overtake
+	SetPropertyFloat(PROP_SPEED_OVERTAKE,0.4);
+    SetPropertyBool(PROP_SPEED_OVERTAKE NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_SPEED_OVERTAKE NSSUBPROP_DESCRIPTION, "speed for overtaking");
+
+	// lane change right back 3
+	SetPropertyFloat(PROP_DISTANCE_RIGHT_BACK,0.6);
+    SetPropertyBool(PROP_DISTANCE_RIGHT_BACK NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_DISTANCE_RIGHT_BACK NSSUBPROP_DESCRIPTION, "the distance for lane change right back 3");
+
+	SetPropertyFloat(PROP_SPEED_RIGHT_BACK, 0.35);
+    SetPropertyBool(PROP_SPEED_RIGHT_BACK NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_SPEED_RIGHT_BACK NSSUBPROP_DESCRIPTION, "the speed for lane change right back 3");
+
+	SetPropertyFloat(PROP_STEER_RIGHT_BACK,90);
+    SetPropertyBool(PROP_STEER_RIGHT_BACK NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_STEER_RIGHT_BACK NSSUBPROP_DESCRIPTION, "the steer for lane change right back 3");
+
+	// lane change left back 4
+	SetPropertyFloat(PROP_DISTANCE_LEFT_BACK,0.7);
+    SetPropertyBool(PROP_DISTANCE_LEFT_BACK NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_DISTANCE_LEFT_BACK NSSUBPROP_DESCRIPTION, "the distance for lane change left back 4");
+
+	SetPropertyFloat(PROP_SPEED_LEFT_BACK,0.35);
+    SetPropertyBool(PROP_SPEED_LEFT_BACK NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_SPEED_LEFT_BACK NSSUBPROP_DESCRIPTION, "the speed for lane change left back 4");
+
+	SetPropertyFloat(PROP_STEER_LEFT_BACK,90);
+    SetPropertyBool(PROP_STEER_LEFT_BACK NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(PROP_STEER_LEFT_BACK NSSUBPROP_DESCRIPTION, "the steer for lane change left back 4");
 }
 
 cLaneChange::~cLaneChange()
@@ -233,33 +276,71 @@ tResult cLaneChange::ReadProperties(const tChar* strPropertyName)
 	//debug
 	m_bDebugModeEnabled = GetPropertyBool("Debug Output to Console");
 
-	// lane change part1
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_DISTANCE1))
+	// lane change part left 1
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_DISTANCE_LEFT))
 	{
-		m_fPropDist1 = static_cast<tFloat32> (GetPropertyFloat(PROP_DISTANCE1));
+		m_fPropDistLeft = static_cast<tFloat32> (GetPropertyFloat(PROP_DISTANCE_LEFT));
 	}
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_SPEED1))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_SPEED_LEFT))
 	{
-		m_fPropSpeed1 = static_cast<tFloat32> (GetPropertyFloat(PROP_SPEED1));
+		m_fPropSpeedLeft = static_cast<tFloat32> (GetPropertyFloat(PROP_SPEED_LEFT));
 	}
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_STEER1))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_STEER_LEFT))
 	{
-		m_fPropSteer1 = static_cast<tFloat32> (GetPropertyFloat(PROP_STEER1));
+		m_fPropSteerLeft = static_cast<tFloat32> (GetPropertyFloat(PROP_STEER_LEFT));
 	}
 
-	// lane change part2
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_DISTANCE2))
+	// lane change part right 2
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_DISTANCE_RIGHT))
 	{
-		m_fPropDist2 = static_cast<tFloat32> (GetPropertyFloat(PROP_DISTANCE2));
+		m_fPropDistRight = static_cast<tFloat32> (GetPropertyFloat(PROP_DISTANCE_RIGHT));
 	}
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_SPEED2))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_SPEED_RIGHT))
 	{
-		m_fPropSpeed2 = static_cast<tFloat32> (GetPropertyFloat(PROP_SPEED2));
+		m_fPropSpeedRight = static_cast<tFloat32> (GetPropertyFloat(PROP_SPEED_RIGHT));
 	}
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_STEER2))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_STEER_RIGHT))
 	{
-		m_fPropSteer2 = static_cast<tFloat32> (GetPropertyFloat(PROP_STEER2));
+		m_fPropSteerRight = static_cast<tFloat32> (GetPropertyFloat(PROP_STEER_RIGHT));
 	}
+
+	// overtake
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_SPEED_OVERTAKE))
+	{
+		m_fPropSpeedOvertake = static_cast<tFloat32> (GetPropertyFloat(PROP_SPEED_OVERTAKE));
+	}
+
+	// lane change part right back 3
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_DISTANCE_RIGHT))
+	{
+		m_fPropDistRightBack = static_cast<tFloat32> (GetPropertyFloat(PROP_DISTANCE_RIGHT_BACK));
+	}
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_SPEED_RIGHT_BACK))
+	{
+		m_fPropSpeedRightBack = static_cast<tFloat32> (GetPropertyFloat(PROP_SPEED_RIGHT_BACK));
+	}
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_STEER_RIGHT_BACK))
+	{
+		m_fPropSteerRightBack = static_cast<tFloat32> (GetPropertyFloat(PROP_STEER_RIGHT_BACK));
+	}
+
+	// lane change part left back 4
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_DISTANCE_LEFT_BACK))
+	{
+		m_fPropDistLeftBack = static_cast<tFloat32> (GetPropertyFloat(PROP_DISTANCE_LEFT_BACK));
+	}
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_SPEED_LEFT_BACK))
+	{
+		m_fPropSpeedLeftBack = static_cast<tFloat32> (GetPropertyFloat(PROP_SPEED_LEFT_BACK));
+	}
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_STEER_LEFT))
+	{
+		m_fPropSteerLeftBack = static_cast<tFloat32> (GetPropertyFloat(PROP_STEER_LEFT));
+	}
+
+
+
+
 	RETURN_NOERROR;
 }
 
@@ -362,7 +443,7 @@ tResult cLaneChange::ProcessManeuver()
 			TurnLeft();
 
 			// after prop_dist change state
-			if (m_fDistanceOverall-m_fDistStart > m_fPropDist1)
+			if (m_fDistanceOverall-m_fDistStart > m_fPropDistLeft)
 			{
 				m_iStateOfLaneChange=SOLG_CHANGELANE2;
 				m_fDistStart = m_fDistanceOverall;
@@ -374,7 +455,7 @@ tResult cLaneChange::ProcessManeuver()
 			TurnRight();
 
 			// after prop_dist change state
-			if (m_fDistanceOverall-m_fDistStart > m_fPropDist2)
+			if (m_fDistanceOverall-m_fDistStart > m_fPropDistRight)
 			{
 				m_iStateOfLaneChange=SOLG_WRONGLANE_CHECK_FR;
 				m_fDistStart = m_fDistanceOverall;
@@ -385,15 +466,15 @@ tResult cLaneChange::ProcessManeuver()
 	case SOLG_WRONGLANE_CHECK_FR:
 		{
 			// output = input of lane follower
-			m_fSteeringOutput=0;
-			m_fSpeedOutput=-15;
+			m_fSteeringOutput=m_fSteeringInput;
+			m_fSpeedOutput=m_fPropSpeedOvertake;
 
 			m_bTurnSignalLeftEnabled=tFalse;
 
 			if(m_bDebugModeEnabled) LOG_INFO(cString::Format("lane change state %i  dist %f", m_iStateOfLaneChange,m_aUSSensors[US_FRONTRIGHT]));
 
 			// change state
-			if ((m_aUSSensors[US_FRONTRIGHT]>100) && (m_fDistanceOverall-m_fDistStart>0.3))
+			if ((m_aUSSensors[US_FRONTRIGHT]>100) && (m_fDistanceOverall-m_fDistStart>0.2))
 			{
 				m_iStateOfLaneChange=SOLG_WRONGLANE_CHECK_R;
 				m_fDistStart = m_fDistanceOverall;
@@ -405,8 +486,8 @@ tResult cLaneChange::ProcessManeuver()
 	case SOLG_WRONGLANE_CHECK_R:
 		{
 			// output = input of lane follower
-			m_fSteeringOutput=0;
-			m_fSpeedOutput=-15;
+			m_fSteeringOutput=m_fSteeringInput;
+			m_fSpeedOutput=m_fPropSpeedOvertake;
 
 			if(m_bDebugModeEnabled) LOG_INFO(cString::Format("lane change state %i  dist %f", m_iStateOfLaneChange,m_aUSSensors[US_SIDERIGHT]));
 
@@ -423,16 +504,16 @@ tResult cLaneChange::ProcessManeuver()
 	case SOLG_WRONGLANE_CHECK_RR:
 		{
 			// output = input of lane follower
-			m_fSteeringOutput=0;
-			m_fSpeedOutput=-15;
+			m_fSteeringOutput=m_fSteeringInput;
+			m_fSpeedOutput=m_fPropSpeedOvertake;
 
 			// change state
-			if ((m_fDistanceOverall-m_fDistStart>0.3))
+			if ((m_fDistanceOverall-m_fDistStart>0.2))
 			{
 				m_iStateOfLaneChange=SOLG_CHANGEBACK1;
 				m_fDistStart = m_fDistanceOverall;
 			}
-			// check in the next 30 cm if the right side is free
+			// check in the next 20 cm if the right side is free
 			else
 			{
 				if(m_aUSSensors[US_SIDERIGHT]<100)
@@ -442,33 +523,12 @@ tResult cLaneChange::ProcessManeuver()
 			}
 			break;
 		}
-
-/*
-	case SOLG_WRONGLANE:
-		{
-			m_fSteeringOutput=0;
-			m_fSpeedOutput=-15;
-
-			m_bTurnSignalLeftEnabled=tFalse;
-
-			// change state
-			if (m_fDistanceOverall-m_fDistStart > 1.0)
-			{
-				m_iStateOfLaneChange=SOLG_CHANGEBACK1;
-				m_fDistStart = m_fDistanceOverall;
-				
-				m_bTurnSignalRightEnabled=tTrue;
-			}
-
-			break;
-		}
-*/
 	case SOLG_CHANGEBACK1:
 		{
 			TurnRightBack();
 
 			// after prop_dist change state
-			if (m_fDistanceOverall-m_fDistStart > m_fPropDist1)
+			if (m_fDistanceOverall-m_fDistStart > m_fPropDistRightBack)
 			{
 				m_iStateOfLaneChange=SOLG_CHANGEBACK2;
 				m_fDistStart = m_fDistanceOverall;
@@ -480,7 +540,7 @@ tResult cLaneChange::ProcessManeuver()
 			TurnLeftBack();
 
 			// after prop_dist change state
-			if (m_fDistanceOverall-m_fDistStart > m_fPropDist2)
+			if (m_fDistanceOverall-m_fDistStart > m_fPropDistLeftBack)
 			{
 				m_iStateOfLaneChange=SOLG_FINISH;
 				m_fDistStart = m_fDistanceOverall;
@@ -516,31 +576,31 @@ tResult cLaneChange::ProcessManeuver()
 
 tResult cLaneChange::TurnRight()
 {
-	m_fSteeringOutput=m_fPropSteer1;
-	m_fSpeedOutput=(-1)*m_fPropSpeed1;
+	m_fSteeringOutput=m_fPropSteerRight;
+	m_fSpeedOutput=m_fPropSpeedRight;
 	RETURN_NOERROR;
 }
 
 
 tResult cLaneChange::TurnLeft()
 {
-	m_fSteeringOutput=(-1)*m_fPropSteer1;
-	m_fSpeedOutput=(-1)*m_fPropSpeed1;
+	m_fSteeringOutput=(-1)*m_fPropSteerLeft;
+	m_fSpeedOutput=m_fPropSpeedLeft;
 	RETURN_NOERROR;
 }
 
 tResult cLaneChange::TurnRightBack()
 {
-	m_fSteeringOutput=m_fPropSteer2;
-	m_fSpeedOutput=(-1)*m_fPropSpeed2;
+	m_fSteeringOutput=m_fPropSteerRightBack;
+	m_fSpeedOutput=m_fPropSpeedRightBack;
 	RETURN_NOERROR;
 }
 
 
 tResult cLaneChange::TurnLeftBack()
 {
-	m_fSteeringOutput=(-1)*m_fPropSteer2;
-	m_fSpeedOutput=(-1)*m_fPropSpeed2;
+	m_fSteeringOutput=(-1)*m_fPropSteerLeftBack;
+	m_fSpeedOutput=m_fPropSpeedLeftBack;
 	RETURN_NOERROR;
 }
 

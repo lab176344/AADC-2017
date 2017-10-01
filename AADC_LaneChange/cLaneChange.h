@@ -189,11 +189,20 @@ protected:
 
 	private:
 		
-		// Properties for change part 1
-		tFloat32    m_fPropDist1,m_fPropSpeed1,m_fPropSteer1;
+		// Properties for change part 1 left
+		tFloat32    m_fPropDistLeft,m_fPropSpeedLeft,m_fPropSteerLeft;
 
-		// Properties for change part 2
-		tFloat32    m_fPropDist2,m_fPropSpeed2,m_fPropSteer2;
+		// Properties for change part 2 right
+		tFloat32    m_fPropDistRight,m_fPropSpeedRight,m_fPropSteerRight;
+
+		// Properties for change part 3 right back
+		tFloat32    m_fPropDistRightBack,m_fPropSpeedRightBack,m_fPropSteerRightBack;
+
+		// Properties for change part 4 left back
+		tFloat32    m_fPropDistLeftBack,m_fPropSpeedLeftBack,m_fPropSteerLeftBack;
+
+		// Property for overtaking speed
+		tFloat32    m_fPropSpeedOvertake;
 };
 
 //*************************************************************************************************
