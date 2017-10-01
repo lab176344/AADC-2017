@@ -119,6 +119,10 @@ protected:
 	cOutputPin m_oOutputOvertake;
 	cObjectPtr<IMediaTypeDescription> m_pDescriptionOvertake;
 
+	/* DEBUG */
+
+	tBool m_bDebugModeEnabled;
+
 	/* MEMBER VARIABLES INPUT*/
 
 	tBool isInitialized_;

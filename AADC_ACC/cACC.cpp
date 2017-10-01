@@ -33,6 +33,8 @@ using namespace SensorDefinition;
 
 cACC::cACC(const tChar* __info):cFilter(__info)
 {
+	SetPropertyBool("Debug Output to Console",true);
+
 	SetPropertyFloat(MAX_DIST,120);
     SetPropertyBool(MAX_DIST NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(MAX_DIST NSSUBPROP_DESCRIPTION, "max dist to go straight");
@@ -45,11 +47,11 @@ cACC::cACC(const tChar* __info):cFilter(__info)
     SetPropertyBool(STEERING_SWITCH_US_FOCUS NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(STEERING_SWITCH_US_FOCUS NSSUBPROP_DESCRIPTION, "at that steering switch the US focus");
 
-	SetPropertyFloat(STOP_TTC,1.5);
+	SetPropertyFloat(STOP_TTC,0.6);
     SetPropertyBool(STOP_TTC NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(STOP_TTC NSSUBPROP_DESCRIPTION, "stop under this time to collision");
 
-	SetPropertyFloat(REDUCE_SPEED_TTC,4);
+	SetPropertyFloat(REDUCE_SPEED_TTC,1.8);
     SetPropertyBool(REDUCE_SPEED_TTC NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(REDUCE_SPEED_TTC NSSUBPROP_DESCRIPTION, "reduce speed under this time to collision");
 }
@@ -156,6 +158,8 @@ tResult cACC::Init(tInitStage eStage, __exception)
     {
         // In this stage you would do further initialisation and/or create your dynamic pins.
         // Please take a look at the demo_dynamicpin example for further reference.
+
+		m_bDebugModeEnabled = GetPropertyBool("Debug Output to Console");
     }
     else if (eStage == StageGraphReady)
     {
@@ -174,6 +178,7 @@ tResult cACC::Init(tInitStage eStage, __exception)
 
 		// init output
 		m_bOvertake=tFalse;
+		m_fAccelerationOutput=0;
     }
 
     RETURN_NOERROR;
@@ -281,6 +286,7 @@ tResult cACC::OnPinEvent(IPin* pSource,
 			{
 				m_fSteeringOutput=0;
 				m_fAccelerationOutput=0;
+				TransmitOutput();
 			}
 				
 		}
@@ -296,6 +302,7 @@ tResult cACC::OnPinEvent(IPin* pSource,
 			pCoderInput->Get("f32Value", (tVoid*)&m_fSpeedControllerInput);
 			pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
 			m_pDescSpeed->Unlock(pCoderInput);
+
         }
 		else if(pSource == &m_oInputCurrentSpeed)
         {
@@ -445,12 +452,12 @@ tResult cACC::CalculateSpeed()
 		// focus on right US sensors
 		if(m_fSteeringInput>0)
 		{
-			fAverageDist=(m_aUSSensors[US_FRONTCENTER] + 2 * m_aUSSensors[US_FRONTCENTERRIGHT] + m_aUSSensors[US_FRONTRIGHT])/4;
+			fAverageDist=(m_aUSSensors[US_FRONTCENTER] + 3 * m_aUSSensors[US_FRONTCENTERRIGHT])/4;
 		}
 		// focus on left US sensors
 		else
 		{
-			fAverageDist=(m_aUSSensors[US_FRONTCENTER] + 2 * m_aUSSensors[US_FRONTCENTERLEFT] +  m_aUSSensors[US_FRONTLEFT])/4;
+			fAverageDist=(m_aUSSensors[US_FRONTCENTER] + 3 * m_aUSSensors[US_FRONTCENTERLEFT])/4;
 		}
 
 	}
@@ -461,7 +468,7 @@ tResult cACC::CalculateSpeed()
 		fAverageDist=m_aUSSensors[US_FRONTCENTER];
 	}
 
-	LOG_INFO(cString::Format("cm %f, m %f", fAverageDist, fAverageDist/100));
+	//if(m_bDebugModeEnabled)LOG_INFO(cString::Format("cm %f, m %f", fAverageDist, fAverageDist/100));
 
 	// fAverageDist from [cm] to [m]
 	fAverageDist=fAverageDist/100;
@@ -476,6 +483,7 @@ tResult cACC::CalculateSpeed()
 	{
 		m_fAccelerationOutput=m_fSpeedControllerInput;
 	}
+	// reduce speed
 	else if( (fTTC<=m_fReduceSpeedTTC) && (fTTC >= m_fStopTTC))
 	{
 		tFloat32 factor=1/(m_fReduceSpeedTTC-m_fStopTTC);
@@ -483,27 +491,27 @@ tResult cACC::CalculateSpeed()
 		// y=m*x + t
 		// m_fAccelerationOutput=factor *m_fCurrentSpeedInput - offset;
 		m_fAccelerationOutput=factor * m_fSpeedControllerInput - offset;
-		LOG_INFO(cString::Format("speed %f, factor %f, offset %f, out %f",m_fCurrentSpeedInput, factor, offset, m_fAccelerationOutput));
+		if(m_bDebugModeEnabled)LOG_INFO(cString::Format("speed %f, factor %f, offset %f, out %f",m_fCurrentSpeedInput, factor, offset, m_fAccelerationOutput));
 	}
-	else if(fTTC < m_fStopTTC)
+	// emergency stop
+	else
 	{
 		m_fAccelerationOutput=0;
 		m_fSteeringOutput=0;
+	
+		TransmitOutput();
+	}
 
+	// check if the speed is to slow or distance is to small
+	
+	if((fAverageDist < 0.6))
+	{
+		m_fAccelerationOutput=0;
+		m_fSteeringOutput=0;
+		
+		TransmitOutput();
 
-		//Test
-		m_bStart=tFalse;
-
-				m_bFlagTimeOvertake=tFalse;
-
-				m_bOvertake=tTrue;
-
-				TransmitOutput();
-
-				TransmitOutputOvertake();
-
-		/*
-
+		// save time stamp
 		if(!m_bFlagTimeOvertake)
 		{
 			timestampOvertake=_clock->GetStreamTime();
@@ -512,7 +520,7 @@ tResult cACC::CalculateSpeed()
 		else
 		{
 			// if speed is too slow for a too long time --> wish to overtake
-			if((_clock->GetStreamTime()-timestampOvertake)/1000000 > 2)
+			if((_clock->GetStreamTime()-timestampOvertake) > 2e6)
 			{
 				m_bStart=tFalse;
 				m_bFlagTimeOvertake=tFalse;
@@ -522,10 +530,9 @@ tResult cACC::CalculateSpeed()
 			}
 		}
 
-		*/
 	}
 
-	LOG_INFO(cString::Format("controller input %f, dist %f, speed %f, TTC %f", m_fSpeedControllerInput, fAverageDist, m_fCurrentSpeedInput, fTTC));
+	if(m_bDebugModeEnabled)LOG_INFO(cString::Format("controller input %f, dist %f, speed %f, TTC %f", m_fSpeedControllerInput, fAverageDist, m_fCurrentSpeedInput, fTTC));
 	
 	RETURN_NOERROR;
 	
