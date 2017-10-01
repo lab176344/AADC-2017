@@ -91,6 +91,10 @@ protected:
 	cInputPin    m_oInputUsStruct;
 	cObjectPtr<IMediaTypeDescription> m_pDescriptionUsStruct;
 
+	// Distance over all
+	cInputPin m_oDistanceOverall;
+	cObjectPtr<IMediaTypeDescription> m_pDescdistanceoverall;
+
 	cCriticalSection m_critSecMinimumUsValue;
 
     std::vector<tBufferID> m_szIdUsStructValues;
@@ -119,6 +123,36 @@ protected:
 	cOutputPin m_oOutputOvertake;
 	cObjectPtr<IMediaTypeDescription> m_pDescriptionOvertake;
 
+
+
+	/* SLAM */
+
+	/*! Input pin for the position data */
+    cInputPin m_InputPostion;
+	cObjectPtr<IMediaTypeDescription> m_pDescriptionPos;
+
+	 //Position input
+    tBool m_PosInputSet;
+  	tFloat32 m_szF32X,m_szF32Y,m_szF32Radius,m_szF32Speed,m_szF32Heading;
+
+	/*! Output pin for the obstacle data */
+	cOutputPin m_OutputObstacle;
+	cObjectPtr<IMediaTypeDescription> m_pDescriptionObstacle;
+
+	//Obstacle Output
+	tFloat32 m_obstacleF32X,m_obstacleF32Y;
+
+	// Flag for scanning left side
+	tBool m_bFlagObstacleLeft;
+	// x Distance of Left Obstacle
+	tFloat32 m_fStartDistLeftObstacle;
+	tFloat32 m_fEndDistLeftObstacle;
+	// x,y Postion of Left Obstacle
+	tFloat32 m_fXPosLeftObstacle;
+	tFloat32 m_fYPosLeftObstacle;
+
+ 
+
 	/* DEBUG */
 
 	tBool m_bDebugModeEnabled;
@@ -131,6 +165,9 @@ protected:
 	tFloat32 m_fSpeedControllerInput;
 	tFloat32 m_fCurrentSpeedInput;
 	tFloat32 m_fSteeringInput;
+
+	// distance over all
+	tFloat32 m_fDistanceOverall;
 
 	/*
 	// storage for US values
@@ -159,10 +196,6 @@ protected:
 	// time stamp
 	tTimeStamp init_time;
 	tUInt32 timestamp;
-
-	// distance over all
-	tFloat32 m_fDistanceOverall;
-	tFloat32 m_fStartDistance;
 
 	/* MEMBER VARIABLES OUTPUT*/
 	tFloat32 m_fSteeringOutput;
@@ -228,17 +261,23 @@ protected:
 	tResult PropertyChanged(const char* strProperty);
 
 	tResult CalculateSpeed();
+
+	tResult ScanningLeftLaneForObstacle();
+
+	tResult ProcessInputPosition(IMediaSample* pMediaSampleIn, tTimeStamp tsInputTime);
 	
 	tResult TransmitOutput();
 
 	tResult TransmitOutputOvertake();
+	
+	tResult TransmitObstaclePosition(tFloat32 i_fXPos, tFloat32 i_fYPos);
 
 
 	private:
 		// properties
-		tFloat32    m_fDistOvertake, m_fSteeringToSwitchFocus;
+		tFloat32    m_fMaxDist, m_fMaxDistCurve, m_fSteeringToSwitchFocus;
 
-		tFloat m_fStopTTC, m_fReduceSpeedTTC;
+		tFloat32 m_fStopTTC, m_fReduceSpeedTTC;
 };
 
 //*************************************************************************************************

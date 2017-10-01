@@ -21,7 +21,8 @@ THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR
 /// Create filter shell
 
 
-#define DIST_OVERTAKE		"cACC::dist_overtake"
+#define MAX_DIST		"cACC::max_dist"
+#define MAX_DIST_CURVE	"cACC::max_dist_curve"
 #define STEERING_SWITCH_US_FOCUS	"cACC::steering_switch_focus"
 #define STOP_TTC	"cACC::stop_ttc"
 #define REDUCE_SPEED_TTC	"cACC::reduce_speed_ttc"
@@ -34,9 +35,13 @@ cACC::cACC(const tChar* __info):cFilter(__info)
 {
 	SetPropertyBool("Debug Output to Console",true);
 
-	SetPropertyFloat(DIST_OVERTAKE,0.6);
-    SetPropertyBool(DIST_OVERTAKE NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(DIST_OVERTAKE NSSUBPROP_DESCRIPTION, "dist to start overtake");
+	SetPropertyFloat(MAX_DIST,120);
+    SetPropertyBool(MAX_DIST NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(MAX_DIST NSSUBPROP_DESCRIPTION, "max dist to go straight");
+
+	SetPropertyFloat(MAX_DIST_CURVE,90);
+    SetPropertyBool(MAX_DIST_CURVE NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(MAX_DIST_CURVE NSSUBPROP_DESCRIPTION, "max dist in curves");
 
 	SetPropertyFloat(STEERING_SWITCH_US_FOCUS,60);
     SetPropertyBool(STEERING_SWITCH_US_FOCUS NSSUBPROP_ISCHANGEABLE,tTrue);
@@ -148,6 +153,25 @@ tResult cACC::Init(tInitStage eStage, __exception)
 		RETURN_IF_FAILED(m_oOutputOvertake.Create("Overtake", pTypeSignalOvertake, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oOutputOvertake));
 
+
+/* SLAM */
+
+// Input pin for position input ADD IN ACC
+		  tChar const * strDescPos = pDescManager->GetMediaDescription("tPosition");
+		  RETURN_IF_POINTER_NULL(strDescPos);
+		  cObjectPtr<IMediaType> pTypePos = new cMediaType(0, 0, 0, "tPosition", strDescPos, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+		  RETURN_IF_FAILED(pTypePos->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionPos));
+		  RETURN_IF_FAILED(m_InputPostion.Create("Position", pTypePos, static_cast<IPinEventSink*> (this)));
+		  RETURN_IF_FAILED(RegisterPin(&m_InputPostion));
+
+		// Output pin for obstacle
+		 tChar const * strDescObstacle = pDescManager->GetMediaDescription("tObstacle");
+		 RETURN_IF_POINTER_NULL(strDescObstacle);
+		 cObjectPtr<IMediaType> pTypeObstacle = new cMediaType(0, 0, 0, "tObstacle", strDescObstacle, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+		 RETURN_IF_FAILED(pTypeObstacle->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionObstacle));
+		 RETURN_IF_FAILED(m_OutputObstacle.Create("Obstacle", pTypeObstacle, static_cast<IPinEventSink*> (this)));
+		 RETURN_IF_FAILED(RegisterPin(&m_OutputObstacle));
+
     }
     else if (eStage == StageNormal)
     {
@@ -174,6 +198,20 @@ tResult cACC::Init(tInitStage eStage, __exception)
 		// init output
 		m_bOvertake=tFalse;
 		m_fAccelerationOutput=0;
+
+		/* SLAM */
+		// Inputs car position
+		m_szF32X=0;
+		m_szF32Y=0;
+		m_szF32Radius=0;
+		m_szF32Speed=0;
+		m_szF32Heading=0;
+		
+		// outputs obastacle position
+		m_obstacleF32X=0;
+		m_obstacleF32Y=0;
+
+		m_bFlagObstacleLeft=tFalse;
     }
 
     RETURN_NOERROR;
@@ -210,9 +248,13 @@ tResult cACC::PropertyChanged(const char* strProperty)
 		
 tResult cACC::ReadProperties(const tChar* strPropertyName)
 {
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, DIST_OVERTAKE))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, MAX_DIST))
 	{
-		m_fDistOvertake = static_cast<tFloat32> (GetPropertyFloat(DIST_OVERTAKE));
+		m_fMaxDist = static_cast<tFloat32> (GetPropertyFloat(MAX_DIST));
+	}
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, MAX_DIST_CURVE))
+	{
+		m_fMaxDistCurve = static_cast<tFloat32> (GetPropertyFloat(MAX_DIST_CURVE));
 	}
 		if (NULL == strPropertyName || cString::IsEqual(strPropertyName, STEERING_SWITCH_US_FOCUS))
 	{
@@ -325,6 +367,27 @@ tResult cACC::OnPinEvent(IPin* pSource,
 			}
 
 		}
+		else  if (pSource == &m_InputPostion)
+		{
+			cObjectPtr<IMediaCoder> pCoderInput;
+			RETURN_IF_FAILED(m_pDescriptionPos->Lock(pMediaSample, &pCoderInput));
+			pCoderInput->Get("f32x", (tVoid*)&m_szF32X);
+			pCoderInput->Get("f32y", (tVoid*)&m_szF32Y);
+			pCoderInput->Get("f32radius", (tVoid*)&m_szF32Radius);
+			pCoderInput->Get("f32speed", (tVoid*)&m_szF32Speed);
+			pCoderInput->Get("f32heading", (tVoid*)&m_szF32Heading);
+			m_pDescriptionPos->Unlock(pCoderInput);
+		}
+		// Input signal at Distance Overall
+		else if (pSource == &m_oDistanceOverall)
+		{
+			//LOG_INFO("Vinoth distance info");
+			cObjectPtr<IMediaCoder> pCoderInput;
+			RETURN_IF_FAILED(m_pDescdistanceoverall->Lock(pMediaSample, &pCoderInput));
+			pCoderInput->Get("f32Value", (tVoid*)&m_fDistanceOverall);
+			pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+			m_pDescdistanceoverall->Unlock(pCoderInput);
+		}
 
 		// only send output ACC is active
 		if(m_bStart)
@@ -336,7 +399,38 @@ tResult cACC::OnPinEvent(IPin* pSource,
 
     RETURN_NOERROR;
 }
+/*
+tResult cACC::ProcessInputPosition(IMediaSample* pMediaSampleIn, tTimeStamp tsInputTime)
+{
 
+  tFloat32 f32x = 0;
+  tFloat32 f32y = 0;
+  tFloat32 f32radius = 0;
+  tFloat32 f32speed = 0;
+  tFloat32 f32heading = 0;
+
+  {   __adtf_sample_read_lock_mediadescription(m_pDescriptionPos,pMediaSampleIn,pCoderInput);
+    // get IDs
+    if (!m_PosInputSet)
+    {
+      pCoderInput->GetID("f32x", m_szF32X);
+      pCoderInput->GetID("f32y", m_szF32Y);
+      pCoderInput->GetID("f32radius", m_szF32Radius);
+      pCoderInput->GetID("f32speed", m_szF32Speed);
+      pCoderInput->GetID("f32heading", m_szF32Heading);
+      m_PosInputSet=tTrue;
+    }
+
+    pCoderInput->Get(m_szF32X, (tVoid*)&f32x);
+    pCoderInput->Get(m_szF32Y, (tVoid*)&f32y);
+    pCoderInput->Get(m_szF32Radius, (tVoid*)&f32radius);
+    pCoderInput->Get(m_szF32Speed, (tVoid*)&f32speed);
+    pCoderInput->Get(m_szF32Heading, (tVoid*)&f32heading);
+
+  }
+  RETURN_NOERROR;
+}
+*/
 
 tResult cACC::ProcessInputUS(IMediaSample* pMediaSample)
 {
@@ -495,7 +589,7 @@ tResult cACC::CalculateSpeed()
 
 	// check if the speed is to slow or distance is to small
 	
-	if((fAverageDist < m_fDistOvertake))
+	if((fAverageDist < 0.6))
 	{
 		m_fAccelerationOutput=0;
 		m_fSteeringOutput=0;
@@ -516,6 +610,12 @@ tResult cACC::CalculateSpeed()
 				m_bStart=tFalse;
 				m_bFlagTimeOvertake=tFalse;
 				m_bOvertake=tTrue;
+
+				// send position of obstacle
+				m_obstacleF32X=m_szF32X+fAverageDist;
+				m_obstacleF32Y=m_szF32Y;
+				TransmitObstaclePosition(m_obstacleF32X, m_obstacleF32Y);
+
 				TransmitOutput();
 				TransmitOutputOvertake();
 			}
@@ -529,6 +629,39 @@ tResult cACC::CalculateSpeed()
 	
 }
 
+tResult cACC::ScanningLeftLaneForObstacle()
+{
+	// check if flag for left obstacle is set
+	if(!m_bFlagObstacleLeft)
+	{
+		// if dist to obstacle is smaller then [50 cm]
+		if(m_aUSSensors[US_SIDELEFT] < 50)
+		{
+			m_bFlagObstacleLeft=tTrue;
+			m_fStartDistLeftObstacle=m_fDistanceOverall;
+			m_fXPosLeftObstacle=m_szF32X;
+			m_fYPosLeftObstacle=m_szF32Y-m_aUSSensors[US_SIDELEFT];
+		}
+	}
+	else
+	{
+		// if obstacle gone, reset flag
+		if(m_aUSSensors[US_SIDELEFT] > 100)
+		{
+			m_bFlagObstacleLeft=tFalse;
+			m_fEndDistLeftObstacle=m_fDistanceOverall;
+
+			// check if the obstacle was large enough bigger then [0.1 m]
+			if((m_fEndDistLeftObstacle-m_fStartDistLeftObstacle) > 0.1)
+			{
+				// send position of obstacle
+				TransmitObstaclePosition(m_fXPosLeftObstacle, m_fYPosLeftObstacle);
+			}
+		}
+	}
+
+	RETURN_NOERROR;
+}
 
 
 tResult cACC::TransmitOutput()
@@ -622,5 +755,24 @@ tResult cACC::TransmitOutputOvertake()
 	pMediaSampleOvertake->SetTime(_clock->GetStreamTime());
 	m_oOutputOvertake.Transmit(pMediaSampleOvertake);
 
+	RETURN_NOERROR;
+}
+
+tResult cACC::TransmitObstaclePosition(tFloat32 i_fXPos, tFloat32 i_fYPos)
+{
+	cObjectPtr<IMediaSample> pMediaSampleObstacle;
+	AllocMediaSample((tVoid**)&pMediaSampleObstacle);
+	// Obstacle output
+	cObjectPtr<IMediaSerializer> pSerializerObstacle;
+	m_pDescriptionObstacle->GetMediaSampleSerializer(&pSerializerObstacle);
+	tInt nSizeTurnSignalObstacle = pSerializerObstacle->GetDeserializedSize();
+	pMediaSampleObstacle->AllocBuffer(nSizeTurnSignalObstacle);
+	cObjectPtr<IMediaCoder> pCoderOutputObstacle;
+	m_pDescriptionObstacle->WriteLock(pMediaSampleObstacle, &pCoderOutputObstacle);
+	pCoderOutputObstacle->Set("f32x", (tVoid*)&(i_fXPos));
+	pCoderOutputObstacle->Set("f32y	", (tVoid*)&(i_fYPos));
+	m_pDescriptionObstacle->Unlock(pCoderOutputObstacle);
+	pMediaSampleObstacle->SetTime(_clock->GetStreamTime());
+	m_OutputObstacle.Transmit(pMediaSampleObstacle);
 	RETURN_NOERROR;
 }
