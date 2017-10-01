@@ -311,7 +311,7 @@ tResult cLaneChange::ReadProperties(const tChar* strPropertyName)
 	}
 
 	// lane change part right back 3
-	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_DISTANCE_RIGHT))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, PROP_DISTANCE_RIGHT_BACK))
 	{
 		m_fPropDistRightBack = static_cast<tFloat32> (GetPropertyFloat(PROP_DISTANCE_RIGHT_BACK));
 	}
