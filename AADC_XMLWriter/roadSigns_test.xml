@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<configuration>		
+	<roadSign id="1" x="10.000" y="100.000" radius="1.0" direction="90"/>
+	<roadSign id="2" x="20.000" y="200.000" radius="1.0" direction="90"/>
+	<roadSign id="3" x="30.000" y="300.000" radius="1.0" direction="90"/>
+	<roadSign id="1" x="11.000" y="100.000" radius="1.0" direction="90"/>
+	<roadSign id="1" x="11.000" y="120.000" radius="1.0" direction="90"/>
+	<roadSign id="1" x="12.000" y="120.000" radius="1.0" direction="90"/>
+</configuration>
