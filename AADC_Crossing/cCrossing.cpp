@@ -237,6 +237,15 @@ tResult cCrossing::Init(tInitStage eStage, __exception)
 		RETURN_IF_FAILED(m_oOutputFinishFlag.Create("FinishFlag", pTypeSignalfinishflag, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oOutputFinishFlag));
 
+
+		// creeate pin for check traffic for crossing
+		tChar const * strDescSignalCheckTraffic = pDescManager->GetMediaDescription("tCheckTrafficForCrossing");
+		RETURN_IF_POINTER_NULL(strDescSignalCheckTraffic);
+		cObjectPtr<IMediaType> pTypeSignalCheckTraffic = new cMediaType(0, 0, 0, "tCheckTrafficForCrossing", strDescSignalCheckTraffic, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+		RETURN_IF_FAILED(pTypeSignalCheckTraffic->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescCheckTraffic));
+		RETURN_IF_FAILED(m_oCheckTraffic.Create("CheckTraffic", pTypeSignalCheckTraffic, static_cast<IPinEventSink*> (this)));
+		RETURN_IF_FAILED(RegisterPin(&m_oCheckTraffic));
+
     }
     else if (eStage == StageNormal)
     {
@@ -268,7 +277,6 @@ tResult cCrossing::Init(tInitStage eStage, __exception)
         {
             LOG_ERROR("Invalid Input Format for this filter");
         }
-
 
 		m_bStart= tFalse;
 
@@ -481,6 +489,18 @@ tResult cCrossing::OnPinEvent(IPin* pSource, tInt nEventCode, tInt nParam1, tInt
 				//pCoderInput->Get("f32Distance2", (tVoid*)&m_fDistEdge2);
 				m_pDescEdgePoint->Unlock(pCoderInput);
 			}
+			// Input signal at Start
+			if (pSource == &m_oCheckTraffic)
+			{
+				cObjectPtr<IMediaCoder> pCoderInput;
+				RETURN_IF_FAILED(m_pDescCheckTraffic->Lock(pMediaSample, &pCoderInput));
+				pCoderInput->Get("bRigth", (tVoid*)&m_bTrafficOnRight);
+				pCoderInput->Get("bStraight", (tVoid*)&m_bTrafficOnStraight);
+				pCoderInput->Get("bLeft", (tVoid*)&m_bTrafficOnLeft);
+				pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+				m_pDescCheckTraffic->Unlock(pCoderInput);
+			}
+
 
 
 		}
@@ -633,11 +653,11 @@ tResult cCrossing::ProcessManeuver()
 			Maneuver(m_iManeuverID, tTrue);
 			break;
 		}
-	// parking --> stop crossing
+	// parking and pedestrians
 	case MARKER_ID_PARKINGAREA:
 	case MARKER_ID_PEDESTRIANCROSSING:
 		{
-			Maneuver(m_iManeuverID, tTrue);
+			// nothing to do on crossing
 			break;
 		}
 	// have away
@@ -807,15 +827,31 @@ tResult cCrossing::TurnRight(tBool bHaveToStop)
 	{
     case SOT_PRIORITYINTRAFFIC:
 		{
-			// Beachtung der Vorfahrtsregeln
+			tBool bNext=tFalse;
+			// have to stop
+			if(bHaveToStop)
+			{
+				// check only left side on turning right
+				if(!m_bTrafficOnLeft)
+				{
+					bNext=tTrue;
+				}
+			}
+			// don't have to stop --> don't check other traffic
+			else
+			{
+				bNext=tTrue;
+			}
 
-			// tbd
-
-			// save start values
-			m_fDistanceOverall_Start=m_fDistanceOverall;
-			m_fYawAngleAtStart=m_fYawAngle;
-			// change state of turn
-			m_iStateOfTurn=SOT_TURN;
+			// next state if traffic is checked and free
+			if(bNext)
+			{
+				// save start values
+				m_fDistanceOverall_Start=m_fDistanceOverall;
+				m_fYawAngleAtStart=m_fYawAngle;
+				// change state of turn
+				m_iStateOfTurn=SOT_TURN;
+			}
 			break;
 		}
     case SOT_TURN:
@@ -887,15 +923,48 @@ tResult cCrossing::TurnLeft(tBool bHaveToStop)
 	{
     case SOT_PRIORITYINTRAFFIC:
 		{
-			// Beachtung der Vorfahrtsregeln
+			tBool bNext=tFalse;
+			// have to stop
+			if(bHaveToStop)
+			{
+				// check left, straight and rigth traffic on turning left
+				if(!m_bTrafficOnLeft && !m_bTrafficOnStraight && !m_bTrafficOnRight)
+				{
+					bNext=tTrue;
+				}
+			}
+			// don't have to stop
+			else
+			{
+				// right before left on turning left
+				if(m_iTrafficSignID==MARKER_ID_UNMARKEDINTERSECTION)
+				{
+					// check if right and straight side is false on turning left
+					if(!m_bTrafficOnRight && !m_bTrafficOnStraight)
+					{
+						bNext=tTrue;
+					}
+				}
+				// only have to check the straight traffic else EGO has higher priority
+				else
+				{
+					// check if right and straight side is false on turning left
+					if(!m_bTrafficOnRight && !m_bTrafficOnStraight)
+					{
+						bNext=tTrue;
+					}
+				}
+			}
 
-			// tbd
-
-			// save start values
-			m_fDistanceOverall_Start=m_fDistanceOverall;
-			m_fYawAngleAtStart=m_fYawAngle;
-			// change state of turn
-			m_iStateOfTurn=SOT_TURN;
+			// next state if traffic is checked and free
+			if(bNext)
+			{
+				// save start values
+				m_fDistanceOverall_Start=m_fDistanceOverall;
+				m_fYawAngleAtStart=m_fYawAngle;
+				// change state of turn
+				m_iStateOfTurn=SOT_TURN;
+			}
 			break;
 		}
     case SOT_TURN:
@@ -966,15 +1035,44 @@ tResult cCrossing::GoStraight(tBool bHaveToStop)
 	{
     case SOT_PRIORITYINTRAFFIC:
 		{
-			// Beachtung der Vorfahrtsregeln
+			tBool bNext=tFalse;
+			// have to stop
+			if(bHaveToStop)
+			{
+				// check only left and rigth traffic on going straight
+				if(!m_bTrafficOnRight && !m_bTrafficOnLeft)
+				{
+					bNext=tTrue;
+				}
+			}
+			// don't have to stop
+			else
+			{
+				// right before left on going straight
+				if(m_iTrafficSignID==MARKER_ID_UNMARKEDINTERSECTION)
+				{
+					// check if right side is false
+					if(!m_bTrafficOnRight)
+					{
+						bNext=tTrue;
+					}
+				}
+				// always higher priority on going straight
+				else
+				{
+					bNext=tTrue;
+				}
+			}
 
-			// tbd
-
-			// save start values
-			m_fDistanceOverall_Start=m_fDistanceOverall;
-			m_fYawAngleAtStart=m_fYawAngle;
-			// change state of turn
-			m_iStateOfTurn=SOT_TURN;
+			// next state if traffic is checked and free
+			if(bNext)
+			{
+				// save start values
+				m_fDistanceOverall_Start=m_fDistanceOverall;
+				m_fYawAngleAtStart=m_fYawAngle;
+				// change state of turn
+				m_iStateOfTurn=SOT_TURN;
+			}
 			break;
 		}
     case SOT_TURN:

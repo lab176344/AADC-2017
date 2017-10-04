@@ -83,6 +83,10 @@ protected:
 	cInputPin m_oEdgePoint;
 	cObjectPtr<IMediaTypeDescription> m_pDescEdgePoint;
 
+	// Check Traffic for Crossing
+	cInputPin m_oCheckTraffic;
+	cObjectPtr<IMediaTypeDescription> m_pDescCheckTraffic;
+
 	// critical section for current traffic sign
 	cCriticalSection m_critSecCurrentTrafficSign;
 
@@ -141,6 +145,12 @@ protected:
 	// steering input of lanefollower
 	tFloat32 m_fInputSteeringOfLaneFollower;
 
+	// check traffic for crossing
+	tBool m_bTrafficOnLeft;
+	tBool m_bTrafficOnStraight;
+	tBool m_bTrafficOnRight;
+
+
 	/* DEBUG */
 
 	tBool m_bDebugModeEnabled;
@@ -163,7 +173,6 @@ protected:
 	// traffic sign
 	//tFloat32 m_fTrafficSignImageSize;
 	tInt16 m_iTrafficSignID;
-
 	tInt8 m_iManeuverID;
 
 	// distance over all
