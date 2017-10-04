@@ -87,6 +87,10 @@ protected:
 	cInputPin   m_oInputSteering;
 	cObjectPtr<IMediaTypeDescription> m_pDescSteering;
 
+	// input first heading angle
+	cInputPin   m_oInputHeadingAngle;
+	cObjectPtr<IMediaTypeDescription> m_pDescHeadingAngle;
+
 	// input ultrasonic struct
 	cInputPin    m_oInputUsStruct;
 	cObjectPtr<IMediaTypeDescription> m_pDescriptionUsStruct;
@@ -147,9 +151,8 @@ protected:
 	// x Distance of Left Obstacle
 	tFloat32 m_fStartDistLeftObstacle;
 	tFloat32 m_fEndDistLeftObstacle;
-	// x,y Postion of Left Obstacle
-	tFloat32 m_fXPosLeftObstacle;
-	tFloat32 m_fYPosLeftObstacle;
+
+	tFloat32 m_fDistYbuffer;
 
  
 
@@ -168,6 +171,9 @@ protected:
 
 	// distance over all
 	tFloat32 m_fDistanceOverall;
+
+	// first heading angle
+	tFloat32 m_fFirstHeadingAngle;
 
 	/*
 	// storage for US values
@@ -265,6 +271,8 @@ protected:
 	tResult ScanningLeftLaneForObstacle();
 
 	tResult ProcessInputPosition(IMediaSample* pMediaSampleIn, tTimeStamp tsInputTime);
+
+	tResult computepose(tFloat32 i_distX, tFloat32 i_distY);
 	
 	tResult TransmitOutput();
 

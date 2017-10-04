@@ -105,6 +105,22 @@ tResult cACC::Init(tInitStage eStage, __exception)
 		RETURN_IF_FAILED(m_oInputSteering.Create("Steering", pTypeSignalSteering, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oInputSteering));
 
+		// create pin for heading angle
+		tChar const * strDescSignalHeadingAngle = pDescManager->GetMediaDescription("tSignalValue");
+		RETURN_IF_POINTER_NULL(strDescSignalHeadingAngle);
+		cObjectPtr<IMediaType> pTypeSignalHeadingAngle = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalHeadingAngle, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+		RETURN_IF_FAILED(pTypeSignalHeadingAngle->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescHeadingAngle));
+		RETURN_IF_FAILED(m_oInputHeadingAngle.Create("Steering", pTypeSignalHeadingAngle, static_cast<IPinEventSink*> (this)));
+		RETURN_IF_FAILED(RegisterPin(&m_oInputHeadingAngle));
+
+		//create pin for Distance over all input
+		tChar const * strDescSignaldistanceoverall = pDescManager->GetMediaDescription("tSignalValue");
+		RETURN_IF_POINTER_NULL(strDescSignaldistanceoverall);
+		cObjectPtr<IMediaType> pTypeSignaldistanceoverall = new cMediaType(0, 0, 0, "tSignalValue", strDescSignaldistanceoverall, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+		RETURN_IF_FAILED(pTypeSignaldistanceoverall->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescdistanceoverall));
+		RETURN_IF_FAILED(m_oDistanceOverall.Create("Distance_Overall", pTypeSignaldistanceoverall, static_cast<IPinEventSink*> (this)));
+		RETURN_IF_FAILED(RegisterPin(&m_oDistanceOverall));
+
 		// create pin for ultrasonic struct input
 		tChar const * strUltrasonicStruct = pDescManager->GetMediaDescription("tUltrasonicStruct");
 		RETURN_IF_POINTER_NULL(strUltrasonicStruct);
@@ -364,6 +380,7 @@ tResult cACC::OnPinEvent(IPin* pSource,
 			{
 				m_fSteeringOutput=m_fSteeringInput;
 				CalculateSpeed();
+				ScanningLeftLaneForObstacle();
 			}
 
 		}
@@ -378,6 +395,13 @@ tResult cACC::OnPinEvent(IPin* pSource,
 			pCoderInput->Get("f32heading", (tVoid*)&m_szF32Heading);
 			m_pDescriptionPos->Unlock(pCoderInput);
 		}
+		else if(pSource == &m_oInputHeadingAngle)
+        {
+			cObjectPtr<IMediaCoder> pCoderInput;
+			RETURN_IF_FAILED(m_pDescHeadingAngle->Lock(pMediaSample, &pCoderInput));
+			pCoderInput->Get("f32Value", (tVoid*)&m_fFirstHeadingAngle);
+			m_pDescHeadingAngle->Unlock(pCoderInput);
+        }
 		// Input signal at Distance Overall
 		else if (pSource == &m_oDistanceOverall)
 		{
@@ -612,8 +636,7 @@ tResult cACC::CalculateSpeed()
 				m_bOvertake=tTrue;
 
 				// send position of obstacle
-				m_obstacleF32X=m_szF32X+fAverageDist;
-				m_obstacleF32Y=m_szF32Y;
+				computepose(fAverageDist, 0);
 				TransmitObstaclePosition(m_obstacleF32X, m_obstacleF32Y);
 
 				TransmitOutput();
@@ -639,8 +662,7 @@ tResult cACC::ScanningLeftLaneForObstacle()
 		{
 			m_bFlagObstacleLeft=tTrue;
 			m_fStartDistLeftObstacle=m_fDistanceOverall;
-			m_fXPosLeftObstacle=m_szF32X;
-			m_fYPosLeftObstacle=m_szF32Y-m_aUSSensors[US_SIDELEFT];
+			m_fDistYbuffer=m_aUSSensors[US_SIDELEFT];
 		}
 	}
 	else
@@ -655,12 +677,25 @@ tResult cACC::ScanningLeftLaneForObstacle()
 			if((m_fEndDistLeftObstacle-m_fStartDistLeftObstacle) > 0.1)
 			{
 				// send position of obstacle
-				TransmitObstaclePosition(m_fXPosLeftObstacle, m_fYPosLeftObstacle);
+				computepose(0, m_fDistYbuffer);
+				TransmitObstaclePosition(m_obstacleF32X, m_obstacleF32Y);
 			}
 		}
 	}
 
 	RETURN_NOERROR;
+}
+
+tResult cACC::computepose(tFloat32 i_distX, tFloat32 i_distY)
+{
+	tFloat32 m_angle_change=m_fFirstHeadingAngle-m_szF32Heading;
+	m_obstacleF32X= i_distX*cos(m_angle_change)-i_distY*sin(m_angle_change);
+	m_obstacleF32Y= i_distY*cos(m_angle_change)+i_distX*sin(m_angle_change);
+
+	if(m_bDebugModeEnabled)LOG_INFO(cString::Format("Roadsign X %f Roadsign Y %f Angle change",m_obstacleF32X,m_obstacleF32Y,m_angle_change));
+
+	RETURN_NOERROR;
+
 }
 
 
