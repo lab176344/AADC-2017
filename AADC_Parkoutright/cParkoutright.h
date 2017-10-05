@@ -15,10 +15,10 @@ THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR
 **********************************************************************
 * $Author:: spiesra $  $Date:: 2017-05-12 09:34:53#$ $Rev:: 63109   $
 **********************************************************************/
-#ifndef _PARKOUTLEFT_H_
-#define _PARKOUTLEFT_H_
+#ifndef _PARKOUTRIGHT_H_
+#define _PARKOUTRIGHT_H_
 
-#define OID_ADTF_PARKOUTLEFT "adtf.example.parkoutleft_filter"
+#define OID_ADTF_PARKOUTRIGHT "adtf.example.parkoutright_filter"
 
 
 /*! @defgroup TemplateFilter
@@ -62,10 +62,10 @@ THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR
 /*!
 * This is a example filter for the AADC
 */
-class cParkoutleft : public adtf::cFilter
+class cParkoutright : public adtf::cFilter
 {
     /*! set the filter ID and the version */
-    ADTF_FILTER(OID_ADTF_PARKOUTLEFT, "Parkoutleft", adtf::OBJCAT_DataFilter);
+    ADTF_FILTER(OID_ADTF_PARKOUTRIGHT, "Parkoutright", adtf::OBJCAT_DataFilter);
 
 protected:
     /*! input pins  */
@@ -73,13 +73,10 @@ protected:
 	cInputPin m_oStart;
 	cObjectPtr<IMediaTypeDescription> m_pDescStart;
 	cInputPin    m_oInputTrafficSign;
+
 	// Obstacle
 	cInputPin m_oObstacle;
 	cObjectPtr<IMediaTypeDescription> m_pDescObstacle;
-
-	// Distance over all
-	cInputPin m_oDistanceOverall;
-	cObjectPtr<IMediaTypeDescription> m_pDescdistanceoverall;
 
         // input pin Diclaration yaw
         cInputPin m_oYaw;
@@ -87,18 +84,19 @@ protected:
         // mamber pin Diclaration yaw
         tFloat32 m_fYaw;
         tFloat32 m_fYaw_Start;
+
         // USRightside
-        cInputPin m_oUSLeftside;
-        cObjectPtr<IMediaTypeDescription> m_pDescUSLeftside;
+        cInputPin m_oUSRightside;
+        cObjectPtr<IMediaTypeDescription> m_pDescUSRightside;
+
+	// Distance over all
+	cInputPin m_oDistanceOverall;
+	cObjectPtr<IMediaTypeDescription> m_pDescdistanceoverall;
 	// Infos about Stop Line
 	cInputPin m_oStopLine;
 	cObjectPtr<IMediaTypeDescription> m_pDescStopLine;
 
-
     /*! output pins */
-        // outout Parkoutleft_Finish
-        cOutputPin m_oOutputParkoutleft_Finish;
-        cObjectPtr<IMediaTypeDescription> m_pDescriptionOutputParkoutleft_Finish;
 	// output steering
 	cOutputPin    m_oOutputSteering;
 	cObjectPtr<IMediaTypeDescription> m_pDescriptionOutputSteering;
@@ -106,6 +104,10 @@ protected:
 	// outout acceleration
 	cOutputPin m_oOutputAcceleration;
 	cObjectPtr<IMediaTypeDescription> m_pDescriptionOutputAcceleration;
+
+        // outout Parkoutright_finish
+        cOutputPin m_oOutputParkoutright_Finish;
+        cObjectPtr<IMediaTypeDescription> m_pDescriptionOutputParkoutright_Finish;
 
         // output Back_Light
         cOutputPin m_oOutputBack_Light;
@@ -130,35 +132,36 @@ protected:
 	cCriticalSection m_critSecCurrentTrafficSign;
 
 
+	// member current traffic sign
+//	tRoadSign m_oCurrentTrafficSign;
+
+	// traffic sign
+	tFloat32 m_fTrafficSignImageSize;
+	tInt16 m_iTrafficSignID;
+
 	/* MEMBER VARIABLES INPUT*/
 
 	tBool m_bStart;
 	tBool m_bObstacle;
-        tFloat32 m_fUSLeftside;
-
+    tFloat32 m_fUSRightside;
 	/* MEMBER VARIABLES PROCESS*/
 
 	
 	tTimeStamp stop_time;
-        tBool m_bFinished;
+
+	tBool m_bFinished;
 	tBool m_bObstacle_check;
 	tBool m_bTurnSignalLeftEnabled;
 	tBool m_bTurnSignalRightEnabled;
-    tInt16 m_iStateOfParkoutleft;
-	tBool m_bTransmitstop;
-	tFloat32 m_fLine_distance;
-	tBool 	m_bLine_detection;
+    tInt16 m_iStateOfParkoutright;
+    tBool m_bTransmitstop;
 	tFloat32 m_fcover_dist;
-	tFloat32 m_fOrientation2StopLine;
 
-
-
-
-	enum StateOfParkoutleftEnums{
+	enum StateOfParkoutrightEnums{
         SOP_NOSTART = 0,
 		SOP_Obstacle,
         SOP_Start_step1,
-        SOP_Leftsteer_front,
+        SOP_Rightsteer_front,
         SOP_Finished      
     };
 	
@@ -166,6 +169,7 @@ protected:
 	tUInt32 timestamp;
 	// debug mode
 	tBool m_bDebugModeEnabled;
+
 	// distance over all
 	tFloat32 m_fDistanceOverall;
 	tFloat32 m_fDistanceOverall_Start;
@@ -173,6 +177,9 @@ protected:
 	/* MEMBER VARIABLES OUTPUT*/
 	tFloat32 m_fSteeringOutput;
 	tFloat32 m_fAccelerationOutput;
+	tFloat32 m_fLine_distance;
+	tBool 	m_bLine_detection;
+	tFloat32 m_fOrientation2StopLine;
 	tBool m_bHazard_Light;
     tBool m_bBack_Light;
     tBool m_bHead_Light;
@@ -182,14 +189,15 @@ protected:
 
 
 
+
 public:
     /*! default constructor for template class
            \param __info   [in] This is the name of the filter instance.
     */
-    cParkoutleft(const tChar* __info);
+    cParkoutright(const tChar* __info);
 
     /*! default destructor */
-    virtual ~cParkoutleft();
+    virtual ~cParkoutright();
 	tResult PropertyChanged(const char* strProperty);
 
 protected:
@@ -233,21 +241,22 @@ protected:
     */
     tResult OnPinEvent(IPin* pSource, tInt nEventCode, tInt nParam1, tInt nParam2, IMediaSample* pMediaSample);
 	tResult ProcessManeuver();
-	tResult stage_parkoutleft();
+	tResult stage_parkoutright();
 	tResult ReadProperties(const tChar* strPropertyName);
+
+	tResult TransmitOutput(tFloat32 speed,tFloat32 steering, tUInt32 timestamp);
 	tResult TransmitFinish();
 	tResult TransmitLight();
-	tResult TransmitOutput(tFloat32 speed,tFloat32 steering, tUInt32 timestamp);
 	private:
 
 		// Properties
-		tFloat32    DIST_PARKOUTLEFT,SPEED_PARKOUTLEFT,DIST_LEFTturn,SPEED_LEFTturn,STEER_LEFTturn ;
+		tFloat32    DIST_PARKOUTRIGHT,SPEED_PARKOUTRIGHT,DIST_RIGHTturn,SPEED_RIGHTturn,STEER_RIGHTturn ;
 		tFloat32    YAW_Diff;
                 tFloat32    propKpSteering;
 };
 
 //*************************************************************************************************
-#endif // _PARKOUTLEFT_H_
+#endif // _PARKOUTRIGHT_H_
 
 /*!
 *@}

@@ -17,66 +17,64 @@ THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR
 **********************************************************************/
 
 #include "stdafx.h"
-#include "cParkoutleft.h"
+#include "cParkoutright.h"
 
-#define DISTANCE_PARKOUT_LEFT 			"cParkoutleft::DIST_PARKOUTLEFT"
-#define SPEED_PARKOUT_LEFT 			"cParkoutleft::SPEED_PARKOUTLEFT"
+#define DISTANCE_PARKOUT_RIGHT 			"cParkoutright::DIST_PARKOUTRIGHT"
+#define SPEED_PARKOUT_RIGHT 			"cParkoutright::SPEED_PARKOUTRIGHT"
 
-#define DISTANCE_LEFT_turn			"cParkoutleft::DIST_LEFTturn"
-#define STEER_LEFT_turn				"cParkoutleft::STEER_LEFTturn"
-#define SPEED_LEFT_turn				"cParkoutleft::SPEED_LEFTturn"
-#define DELTA_YAW				"cParkoutleft::YAW_Diff"
-#define KPSTEERING				"cParkoutleft::kpsteering"
-
+#define DISTANCE_RIGHT_turn			"cParkoutright::DIST_RIGHTturn"
+#define STEER_RIGHT_turn                        "cParkoutright::STEER_RIGHTturn"
+#define SPEED_RIGHT_turn                        "cParkoutright::SPEED_RIGHTturn"
+#define DELTA_YAW				"cParkoutright::YAW_Diff"
+#define KPSTEERING				"cParkoutright::kpsteering"
 /// Create filter shell
-ADTF_FILTER_PLUGIN("Parkoutleft", OID_ADTF_PARKOUTLEFT, cParkoutleft);
+ADTF_FILTER_PLUGIN("Parkoutright", OID_ADTF_PARKOUTRIGHT, cParkoutright);
 
 using namespace roadsignIDs;
 
-cParkoutleft::cParkoutleft(const tChar* __info):cFilter(__info)
+cParkoutright::cParkoutright(const tChar* __info):cFilter(__info)
 {
 // set properties for Dibug
     // m_bDebugModeEnabled = tTrue;
     SetPropertyBool("Debug Output to Console",false);
 // set properties for STRIGHT front
-        SetPropertyFloat(DISTANCE_PARKOUT_LEFT,0.7);
-    SetPropertyBool(DISTANCE_PARKOUT_LEFT NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(DISTANCE_PARKOUT_LEFT NSSUBPROP_DESCRIPTION, "the distance for the PARKOUT_LEFT");
+        SetPropertyFloat(DISTANCE_PARKOUT_RIGHT,0.2);
+    SetPropertyBool(DISTANCE_PARKOUT_RIGHT NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(DISTANCE_PARKOUT_RIGHT NSSUBPROP_DESCRIPTION, "the distance for the PARKOUT_RIGHT");
 
-        SetPropertyFloat(SPEED_PARKOUT_LEFT,0.4);
-    SetPropertyBool(SPEED_PARKOUT_LEFT NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(SPEED_PARKOUT_LEFT NSSUBPROP_DESCRIPTION, "the speed for the PARKOUT_LEFT");
+        SetPropertyFloat(SPEED_PARKOUT_RIGHT,0.4);
+    SetPropertyBool(SPEED_PARKOUT_RIGHT NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(SPEED_PARKOUT_RIGHT NSSUBPROP_DESCRIPTION, "the speed for the PARKOUT_RIGHT");
 
-// set properties for LEFT TURN
-        SetPropertyFloat(DISTANCE_LEFT_turn,1.25);
-    SetPropertyBool(DISTANCE_LEFT_turn NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(DISTANCE_LEFT_turn NSSUBPROP_DESCRIPTION, "the distance for the steer LEFT_turn");
+// set properties for RIGHT TURN	
+	SetPropertyFloat(DISTANCE_RIGHT_turn,1.1);
+    SetPropertyBool(DISTANCE_RIGHT_turn NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(DISTANCE_RIGHT_turn NSSUBPROP_DESCRIPTION, "the distance for the steer RIGHT_turn");
 
-	SetPropertyFloat(STEER_LEFT_turn,-75);
-    SetPropertyBool(STEER_LEFT_turn NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(STEER_LEFT_turn NSSUBPROP_DESCRIPTION, "the steer for LEFT_turn");
+	SetPropertyFloat(STEER_RIGHT_turn,90);
+    SetPropertyBool(STEER_RIGHT_turn NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(STEER_RIGHT_turn NSSUBPROP_DESCRIPTION, "the steer for RIGHT_turn");
 
-        SetPropertyFloat(SPEED_LEFT_turn,0.4);
-    SetPropertyBool(SPEED_LEFT_turn NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(SPEED_LEFT_turn NSSUBPROP_DESCRIPTION, "the speed for the steer LEFT_turn");
+        SetPropertyFloat(SPEED_RIGHT_turn,0.4);
+    SetPropertyBool(SPEED_RIGHT_turn NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(SPEED_RIGHT_turn NSSUBPROP_DESCRIPTION, "the speed for the steer RIGHT_turn");
 
 	SetPropertyFloat(DELTA_YAW,12);
-    SetPropertyBool(DELTA_YAW NSSUBPROP_ISCHANGEABLE,tTrue);	cInputPin    m_oInputTrafficSign;
+    SetPropertyBool(DELTA_YAW NSSUBPROP_ISCHANGEABLE,tTrue);
     SetPropertyStr(DELTA_YAW NSSUBPROP_DESCRIPTION, "yaw diffrence for turn");
 
-        SetPropertyFloat(KPSTEERING,20);
-    SetPropertyBool(KPSTEERING NSSUBPROP_ISCHANGEABLE,tTrue);
-    SetPropertyStr(KPSTEERING NSSUBPROP_DESCRIPTION, "Kp value for steering control until stop line");
+    SetPropertyFloat(KPSTEERING,20);
+SetPropertyBool(KPSTEERING NSSUBPROP_ISCHANGEABLE,tTrue);
+SetPropertyStr(KPSTEERING NSSUBPROP_DESCRIPTION, "Kp value for steering control until stop line");
+
 }
 
-
-
-cParkoutleft::~cParkoutleft()
+cParkoutright::~cParkoutright()
 {
 
 }
 
-tResult cParkoutleft::Init(tInitStage eStage, __exception)
+tResult cParkoutright::Init(tInitStage eStage, __exception)
 {
     // never miss calling the parent implementation!!
     RETURN_IF_FAILED(cFilter::Init(eStage, __exception_ptr))
@@ -115,20 +113,35 @@ tResult cParkoutleft::Init(tInitStage eStage, __exception)
 
 
 //create pin for start pin		
-		tChar const * strDescSignalstart = pDescManager->GetMediaDescription("tBoolSignalValue");
-		RETURN_IF_POINTER_NULL(strDescSignalstart);
-		cObjectPtr<IMediaType> pTypeSignalstart = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalstart, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
-		RETURN_IF_FAILED(pTypeSignalstart->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescStart));
-		RETURN_IF_FAILED(m_oStart.Create("Start", pTypeSignalstart, static_cast<IPinEventSink*> (this)));
-		RETURN_IF_FAILED(RegisterPin(&m_oStart));
+				tChar const * strDescSignalstart = pDescManager->GetMediaDescription("tBoolSignalValue");
+				RETURN_IF_POINTER_NULL(strDescSignalstart);
+				cObjectPtr<IMediaType> pTypeSignalstart = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalstart, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+				RETURN_IF_FAILED(pTypeSignalstart->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescStart));
+				RETURN_IF_FAILED(m_oStart.Create("Start", pTypeSignalstart, static_cast<IPinEventSink*> (this)));
+				RETURN_IF_FAILED(RegisterPin(&m_oStart));
 
 //create pin for Obstacle pin		
-		tChar const * strDescSignalObstacle = pDescManager->GetMediaDescription("tBoolSignalValue");
-		RETURN_IF_POINTER_NULL(strDescSignalObstacle);
-		cObjectPtr<IMediaType> pTypeSignalObstacle = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalObstacle, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
-		RETURN_IF_FAILED(pTypeSignalObstacle->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescObstacle));
-                RETURN_IF_FAILED(m_oObstacle.Create("Obstacle", pTypeSignalObstacle, static_cast<IPinEventSink*> (this)));
-		RETURN_IF_FAILED(RegisterPin(&m_oObstacle));
+				tChar const * strDescSignalObstacle = pDescManager->GetMediaDescription("tBoolSignalValue");
+				RETURN_IF_POINTER_NULL(strDescSignalObstacle);
+				cObjectPtr<IMediaType> pTypeSignalObstacle = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalObstacle, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+				RETURN_IF_FAILED(pTypeSignalObstacle->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescObstacle));
+                                RETURN_IF_FAILED(m_oObstacle.Create("Obstacle", pTypeSignalObstacle, static_cast<IPinEventSink*> (this)));
+				RETURN_IF_FAILED(RegisterPin(&m_oObstacle));
+//create pin for Yaw input
+                tChar const * strDescSignalYaw = pDescManager->GetMediaDescription("tSignalValue");
+                RETURN_IF_POINTER_NULL(strDescSignalYaw);
+                cObjectPtr<IMediaType> pTypeSignalYaw = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalYaw, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+                RETURN_IF_FAILED(pTypeSignalYaw->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescYaw));
+                RETURN_IF_FAILED(m_oYaw.Create("Yaw", pTypeSignalYaw, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oYaw));
+//create pin for US Rightside input
+                tChar const * strDescSignalUSRightside = pDescManager->GetMediaDescription("tSignalValue");
+                RETURN_IF_POINTER_NULL(strDescSignalUSRightside);
+                cObjectPtr<IMediaType> pTypeSignalUSRightside = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalUSRightside, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+                RETURN_IF_FAILED(pTypeSignalUSRightside->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescUSRightside));
+                RETURN_IF_FAILED(m_oUSRightside.Create("US_Rightside", pTypeSignalUSRightside, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oUSRightside));
+
 
 //create pin for Distance over all input
 		tChar const * strDescSignaldistanceoverall = pDescManager->GetMediaDescription("tSignalValue");
@@ -138,22 +151,6 @@ tResult cParkoutleft::Init(tInitStage eStage, __exception)
 		RETURN_IF_FAILED(m_oDistanceOverall.Create("Distance_Overall", pTypeSignaldistanceoverall, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oDistanceOverall));
 
-//create pin for Yaw input
-                tChar const * strDescSignalYaw = pDescManager->GetMediaDescription("tSignalValue");
-                RETURN_IF_POINTER_NULL(strDescSignalYaw);
-                cObjectPtr<IMediaType> pTypeSignalYaw = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalYaw, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
-                RETURN_IF_FAILED(pTypeSignalYaw->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescYaw));
-                RETURN_IF_FAILED(m_oYaw.Create("Yaw", pTypeSignalYaw, static_cast<IPinEventSink*> (this)));
-                RETURN_IF_FAILED(RegisterPin(&m_oYaw));
-
-//create pin for US Leftside input
-                tChar const * strDescSignalUSLeftside = pDescManager->GetMediaDescription("tSignalValue");
-                RETURN_IF_POINTER_NULL(strDescSignalUSLeftside);
-                cObjectPtr<IMediaType> pTypeSignalUSLeftside = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalUSLeftside, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
-                RETURN_IF_FAILED(pTypeSignalUSLeftside->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescUSLeftside));
-                RETURN_IF_FAILED(m_oUSLeftside.Create("US_Leftside", pTypeSignalUSLeftside, static_cast<IPinEventSink*> (this)));
-                RETURN_IF_FAILED(RegisterPin(&m_oUSLeftside));
-
 // create pin for Infos about Stop Line
 		tChar const * strDescStopLine = pDescManager->GetMediaDescription("tStoplineStruct");
 		RETURN_IF_POINTER_NULL(strDescStopLine);
@@ -162,13 +159,14 @@ tResult cParkoutleft::Init(tInitStage eStage, __exception)
 		RETURN_IF_FAILED(m_oStopLine.Create("StopLine", pTypeSignalStopLine, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oStopLine));
 
-// Output - Parkoutleft_Finish
-                tChar const * strDescSignalParkoutleft_Finish = pDescManager->GetMediaDescription("tBoolSignalValue"); //tBoolSignalValue
-                RETURN_IF_POINTER_NULL(strDescSignalParkoutleft_Finish);
-                cObjectPtr<IMediaType> pTypeSignalParkoutleft_Finish = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalParkoutleft_Finish, 	IMediaDescription::MDF_DDL_DEFAULT_VERSION);
-                RETURN_IF_FAILED(pTypeSignalParkoutleft_Finish->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionOutputParkoutleft_Finish));
-                RETURN_IF_FAILED(m_oOutputParkoutleft_Finish.Create("Parkoutleft Finish", pTypeSignalParkoutleft_Finish, static_cast<IPinEventSink*> (this)));
-                RETURN_IF_FAILED(RegisterPin(&m_oOutputParkoutleft_Finish));
+// Output - Parkoutright_Finish
+                tChar const * strDescSignalParkoutright_Finish = pDescManager->GetMediaDescription("tBoolSignalValue"); //tBoolSignalValue
+                RETURN_IF_POINTER_NULL(strDescSignalParkoutright_Finish);
+                cObjectPtr<IMediaType> pTypeSignalParkoutright_Finish = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalParkoutright_Finish, 	IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+
+                RETURN_IF_FAILED(pTypeSignalParkoutright_Finish->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionOutputParkoutright_Finish));
+                RETURN_IF_FAILED(m_oOutputParkoutright_Finish.Create("Parkoutright Finish", pTypeSignalParkoutright_Finish, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oOutputParkoutright_Finish));
 
 //create pin for steering signal output
 				tChar const * strDescSignalSteering = pDescManager->GetMediaDescription("tSignalValue");
@@ -239,7 +237,7 @@ tResult cParkoutleft::Init(tInitStage eStage, __exception)
     {
         // In this stage you would do further initialisation and/or create your dynamic pins.
         // Please take a look at the demo_dynamicpin example for further reference.
-	m_bDebugModeEnabled = GetPropertyBool("Debug Output to Console");    
+        m_bDebugModeEnabled = GetPropertyBool("Debug Output to Console");
     }
     else if (eStage == StageGraphReady)
     {
@@ -247,25 +245,25 @@ tResult cParkoutleft::Init(tInitStage eStage, __exception)
 		m_fAccelerationOutput=0;
 		m_fSteeringOutput=0;
 		m_bStart=tFalse;
-		if(m_bDebugModeEnabled) LOG_INFO(cString::Format("Start bool false"));
-		m_bTransmitstop= tFalse;
+		m_iStateOfParkoutright=SOP_NOSTART;
+                m_bDebugModeEnabled = GetPropertyBool("Debug Output to Console");
 		// init process values
-        m_iStateOfParkoutleft=SOP_NOSTART;
-		m_fYaw=0;
-		m_fYaw_Start=0;
-		m_bObstacle = tTrue;
+		m_bTransmitstop=tFalse;
+                m_fYaw_Start=0;
+                m_fYaw=0;
+                m_bHazard_Light= tFalse;
+                m_bBack_Light= tFalse;
+                m_bHead_Light= tFalse;
+                m_bTurnLeft_Light= tFalse;
+                m_bTurnRight_Light= tFalse;
+                m_bBreak_Light= tFalse;
 		m_bFinished=tFalse;
+		m_bTurnSignalLeftEnabled=tFalse;
+		m_bTurnSignalRightEnabled=tFalse;	
 		m_bLine_detection = tFalse;
+		m_bObstacle = tTrue;
 		m_fLine_distance = 0;
 		m_fcover_dist = 0;
-		m_bHazard_Light= tFalse;
-        m_bBack_Light= tFalse;
-        m_bHead_Light= tFalse;
-        m_bTurnLeft_Light= tFalse;
-        m_bTurnRight_Light= tFalse;
-        m_bBreak_Light= tFalse;
-		m_bTurnSignalLeftEnabled=tFalse;
-		m_bTurnSignalRightEnabled=tFalse;
         // about their media types and additional meta data.
         // Please take a look at the demo_imageproc example for further reference.
     }
@@ -273,7 +271,7 @@ tResult cParkoutleft::Init(tInitStage eStage, __exception)
     RETURN_NOERROR;
 }
 
-tResult cParkoutleft::Shutdown(tInitStage eStage, __exception)
+tResult cParkoutright::Shutdown(tInitStage eStage, __exception)
 {
     // In each stage clean up everything that you initiaized in the corresponding stage during Init.
     // Pins are an exception:
@@ -284,33 +282,30 @@ tResult cParkoutleft::Shutdown(tInitStage eStage, __exception)
     if (eStage == StageGraphReady)
     {
 
-
-		// initial values for steering and acceleration
+// initial values for steering and acceleration
 		m_fAccelerationOutput=0;
 		m_fSteeringOutput=0;
 		m_bStart=tFalse;
-		if(m_bDebugModeEnabled) LOG_INFO(cString::Format("Start bool false"));
-        m_iStateOfParkoutleft=SOP_NOSTART;
-		// init process values
-		m_fYaw=0;
-		m_fYaw_Start=0;
-		m_bObstacle = tTrue;
+		m_iStateOfParkoutright=SOP_NOSTART;
+		m_bTransmitstop=tFalse;
 		m_bHazard_Light= tFalse;
         m_bBack_Light= tFalse;
         m_bHead_Light= tFalse;
         m_bTurnLeft_Light= tFalse;
         m_bTurnRight_Light= tFalse;
         m_bBreak_Light= tFalse;
-		m_bTransmitstop= tFalse;
+		// init process values
 		m_bFinished=tFalse;
 		m_bTurnSignalLeftEnabled=tFalse;
 		m_bTurnSignalRightEnabled=tFalse;
 		m_bLine_detection = tFalse;
 		m_fLine_distance = 0;
-		m_fcover_dist = 0;
+		m_fcover_dist = 0; 
+		m_bObstacle = tTrue;
     }
     else if (eStage == StageNormal)
     {
+                m_bDebugModeEnabled = GetPropertyBool("Debug Output to Console");
     }
     else if (eStage == StageFirst)
     {
@@ -320,35 +315,35 @@ tResult cParkoutleft::Shutdown(tInitStage eStage, __exception)
     return cFilter::Shutdown(eStage, __exception_ptr);
 }
 
-tResult cParkoutleft::PropertyChanged(const char* strProperty)
+tResult cParkoutright::PropertyChanged(const char* strProperty)
 {
 	ReadProperties(strProperty);
 	RETURN_NOERROR;
 }
 
-tResult cParkoutleft::ReadProperties(const tChar* strPropertyName)
+tResult cParkoutright::ReadProperties(const tChar* strPropertyName)
 {
 //check properties for lanefollow front
-        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, DISTANCE_PARKOUT_LEFT))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, DISTANCE_PARKOUT_RIGHT))
 	{
-                DIST_PARKOUTLEFT = static_cast<tFloat32> (GetPropertyFloat(DISTANCE_PARKOUT_LEFT));
+		DIST_PARKOUTRIGHT = static_cast<tFloat32> (GetPropertyFloat(DISTANCE_PARKOUT_RIGHT));
 	}
-        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, SPEED_PARKOUT_LEFT))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, SPEED_PARKOUT_RIGHT))
 	{
-                SPEED_PARKOUTLEFT = static_cast<tFloat32> (GetPropertyFloat(SPEED_PARKOUT_LEFT));
+		SPEED_PARKOUTRIGHT = static_cast<tFloat32> (GetPropertyFloat(SPEED_PARKOUT_RIGHT));
 	}
 //check properties for steer out front
-        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, DISTANCE_LEFT_turn))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, DISTANCE_RIGHT_turn))
 	{
-                DIST_LEFTturn = static_cast<tFloat32> (GetPropertyFloat(DISTANCE_LEFT_turn));
+		DIST_RIGHTturn = static_cast<tFloat32> (GetPropertyFloat(DISTANCE_RIGHT_turn));
 	}
-        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, SPEED_LEFT_turn))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, SPEED_RIGHT_turn))
 	{
-                SPEED_LEFTturn = static_cast<tFloat32> (GetPropertyFloat(SPEED_LEFT_turn));
+		SPEED_RIGHTturn = static_cast<tFloat32> (GetPropertyFloat(SPEED_RIGHT_turn));
 	}
-        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, STEER_LEFT_turn))
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, STEER_RIGHT_turn))
 	{
-                STEER_LEFTturn = static_cast<tFloat32> (GetPropertyFloat(STEER_LEFT_turn));
+		STEER_RIGHTturn = static_cast<tFloat32> (GetPropertyFloat(STEER_RIGHT_turn));
 	}
 	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, DELTA_YAW))
 	{
@@ -358,11 +353,10 @@ tResult cParkoutleft::ReadProperties(const tChar* strPropertyName)
         {
                 propKpSteering = static_cast<tFloat32> (GetPropertyFloat(KPSTEERING));
         }
-
 	RETURN_NOERROR;
 }
 
-tResult cParkoutleft::OnPinEvent(IPin* pSource,
+tResult cParkoutright::OnPinEvent(IPin* pSource,
                                     tInt nEventCode,
                                     tInt nParam1,
                                     tInt nParam2,
@@ -382,11 +376,11 @@ tResult cParkoutleft::OnPinEvent(IPin* pSource,
 			pCoderInput->Get("bValue", (tVoid*)&m_bStart);
 			pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
 			m_pDescStart->Unlock(pCoderInput);
-			if(!m_bStart)
+			 if(!m_bStart)
           		{	
 
                	stop_time = _clock->GetStreamTime();
-				m_bTransmitstop= tTrue;
+				m_bTransmitstop = tTrue;
 				if (m_bTransmitstop)
                     {
                         m_bHazard_Light= tFalse;
@@ -400,7 +394,7 @@ tResult cParkoutleft::OnPinEvent(IPin* pSource,
                     }
 				}
 		}
-				// Input signal at Obstacle
+		// Input signal at Obstacle
 				if (pSource == &m_oObstacle)
 				{
 					cObjectPtr<IMediaCoder> pCoderInput;
@@ -411,7 +405,7 @@ tResult cParkoutleft::OnPinEvent(IPin* pSource,
 
 				}
 
-               // Input signal at Yaw
+                // Input signal at YaW
                 else if (pSource == &m_oYaw)
                 {
                         cObjectPtr<IMediaCoder> pCoderInput;
@@ -420,17 +414,16 @@ tResult cParkoutleft::OnPinEvent(IPin* pSource,
                         pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
                         m_pDescYaw->Unlock(pCoderInput);
                 }
-
-                //Input signal at us left side
-                else if (pSource == &m_oUSLeftside)
+                else if (pSource == &m_oUSRightside)
                 {
-                        cObjectPtr<IMediaCoder> pCoderInput;
-                        RETURN_IF_FAILED(m_pDescUSLeftside->Lock(pMediaSample, &pCoderInput));
-                        pCoderInput->Get("f32Value", (tVoid*)&m_fUSLeftside);
-                        pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
-                        m_pDescUSLeftside->Unlock(pCoderInput);
+                    cObjectPtr<IMediaCoder> pCoderInput;
+                    RETURN_IF_FAILED(m_pDescUSRightside->Lock(pMediaSample, &pCoderInput));
+                    pCoderInput->Get("f32Value", (tVoid*)&m_fUSRightside);
+                    pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+                    m_pDescUSRightside->Unlock(pCoderInput);
                 }
-                    // Input signal at Distance Overall
+
+		// Input signal at Distance Overall
 		else if (pSource == &m_oDistanceOverall)
 		{
 			//if(m_bDebugModeEnabled) LOG_INFO("Vinoth distance info");
@@ -440,6 +433,7 @@ tResult cParkoutleft::OnPinEvent(IPin* pSource,
 			pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
 			m_pDescdistanceoverall->Unlock(pCoderInput);
 		}
+		// Input signal at linestop
 			else if (pSource == &m_oStopLine)
 			{
 				cObjectPtr<IMediaCoder> pCoderInput;
@@ -452,31 +446,29 @@ tResult cParkoutleft::OnPinEvent(IPin* pSource,
 			}
 
 
-		// stop signal
+// stop signal
 	if(!m_bStart)
 	{
-		if(m_bDebugModeEnabled) LOG_INFO(cString::Format("Start bool false"));
+		//if(m_bDebugModeEnabled) LOG_INFO(cString::Format("Start bool false"));
 		m_fAccelerationOutput=0;
 		m_fSteeringOutput=0;
-                m_iStateOfParkoutleft=SOP_NOSTART;
+                m_iStateOfParkoutright=SOP_NOSTART;
+
 			if(m_bTransmitstop)
 			{
-				if(m_bDebugModeEnabled) LOG_INFO(cString::Format("stop signal"));
+				//if(m_bDebugModeEnabled) LOG_INFO(cString::Format("stop signal"));
 				TransmitOutput(m_fSteeringOutput,m_fAccelerationOutput, 0);
 				m_bTransmitstop= tFalse;
 		        }
-
-
 	}
-	else
 
+	else
 	{
 		if(m_bDebugModeEnabled) LOG_INFO(cString::Format("Start bool true"));
-
-		stage_parkoutleft();
+		stage_parkoutright();
 		TransmitLight();
 		TransmitOutput(m_fSteeringOutput,m_fAccelerationOutput, 0);
-	}	
+	}
     }
 
 }
@@ -484,12 +476,13 @@ tResult cParkoutleft::OnPinEvent(IPin* pSource,
 }
 
 
-tResult cParkoutleft::stage_parkoutleft()
+tResult cParkoutright::stage_parkoutright()
 {
-switch(m_iStateOfParkoutleft)
+        if(m_bDebugModeEnabled) LOG_INFO(cString::Format("PARKING OUT Right"));
+	switch(m_iStateOfParkoutright)
         {
-        LOG_INFO(cString::Format("PARKoutleft"));
-        if(m_bDebugModeEnabled)LOG_INFO(cString::Format("Parkoutleft case: %d",m_iStateOfParkoutleft));
+        LOG_INFO(cString::Format("PARKoutright"));
+        if(m_bDebugModeEnabled)LOG_INFO(cString::Format("Parkoutright case: %d",m_iStateOfParkoutright));
         case SOP_NOSTART:
                 {
 
@@ -498,30 +491,30 @@ switch(m_iStateOfParkoutleft)
                         m_fAccelerationOutput=0;
                         //reset finish flag
                         m_bFinished=tFalse;
-						stop_time = _clock->GetStreamTime();
 						m_bBreak_Light = tTrue;
                         // change state of turn when StartSignal is true
                         if(m_bStart)
                                 {
-
-										m_iStateOfParkoutleft = SOP_Obstacle;
+										m_bHead_Light= tTrue;
+										m_iStateOfParkoutright = SOP_Obstacle;
 										m_bObstacle = tTrue;
-										m_bBreak_Light = tTrue;
                                         //save the first distance and get started
                                         m_fDistanceOverall_Start=m_fDistanceOverall;
-                                        m_fcover_dist = DIST_PARKOUTLEFT;
-                                        if (m_bLine_detection && m_fLine_distance >80 && m_fLine_distance < 100)
+                                        if (m_bLine_detection)
                                         {
-                                                m_fcover_dist = (m_fLine_distance/100)-0.65;
-                                                LOG_INFO(cString::Format("cover distance by farline"));
 
                                                 m_bLine_detection = tFalse;
-                                        }
-                                        else if (m_bLine_detection && m_fLine_distance <70)
-                                        {
-                                                m_fcover_dist = (m_fLine_distance / 100)-0.15;
-                                                 LOG_INFO(cString::Format("cover distance by midline"));
-                                                m_bLine_detection = tFalse;
+                                                m_fcover_dist = DIST_PARKOUTRIGHT;
+                                                if (m_bLine_detection && m_fLine_distance >80 && m_fLine_distance < 120)
+                                                {
+                                                        m_fcover_dist = (m_fLine_distance / 100) - 0.75;
+                                                        m_bLine_detection = tFalse;
+                                                }
+                                                else if (m_bLine_detection && m_fLine_distance <60)
+                                                {
+                                                        m_fcover_dist = (m_fLine_distance / 100) - 0.30;
+                                                        m_bLine_detection = tFalse;
+                                                }
                                         }
                                 }
                         break;
@@ -540,90 +533,81 @@ switch(m_iStateOfParkoutleft)
 								 else
 								 {
 									 stop_time = _clock->GetStreamTime(); //timer reset
-									 m_iStateOfParkoutleft = SOP_Start_step1;
+									 m_iStateOfParkoutright = SOP_Start_step1;
 									 m_bBreak_Light = tFalse;
 									 m_bHead_Light = tTrue;
 								 }
 							 }
 
-							break;
+							 break;
 		}
-        case SOP_Start_step1:
-                {
-									if (m_fDistanceOverall - m_fDistanceOverall_Start < m_fcover_dist) // distance for first_lanefollow
-									{
+		case SOP_Start_step1:
+						{
 
-										if (m_bDebugModeEnabled)LOG_INFO(cString::Format("Step 1:desired distance"));
-										if (m_bLine_detection)
-										{
-											m_fSteeringOutput = propKpSteering*(m_fOrientation2StopLine - 90);		//steering control if feedback is available
-										}
-										LOG_INFO(cString::Format("cover distance by farline = %f", m_fcover_dist));
-										LOG_INFO(cString::Format("line distance by farline = %f", m_fLine_distance));
-										m_fAccelerationOutput = SPEED_PARKOUTLEFT;
-										stop_time = _clock->GetStreamTime();
-										
+								if (m_bDebugModeEnabled) LOG_INFO(cString::Format("Step 1:desired distance"));
+								if (m_fDistanceOverall - m_fDistanceOverall_Start < m_fcover_dist) // distance for first_lanefollow
+								{
+									if (m_bDebugModeEnabled)LOG_INFO(cString::Format("Step 1:desired distance"));
+									m_fSteeringOutput = propKpSteering*(m_fOrientation2StopLine - 90);	//accuator output
+									m_fAccelerationOutput = SPEED_PARKOUTRIGHT;
+									stop_time = _clock->GetStreamTime();
+									if (m_bLine_detection && m_fLine_distance > 80)
+									{
+										m_fcover_dist = (m_fLine_distance / 100) - 0.75;
+										m_bLine_detection = tFalse;
+									}
+								}
+								else
+								{
+
+									if ((_clock->GetStreamTime() - stop_time) / 1000000 < 1) //time for wait
+									{
+										if (m_bDebugModeEnabled) LOG_INFO(cString::Format("Step 1:wait"));
+										m_fSteeringOutput = 0;		//accuator output for backside_lanefollow
+										m_fAccelerationOutput = 0;
+										m_bBreak_Light = tTrue;
 
 									}
-								
-                        else
-                                {
-                                        if (m_fUSLeftside < 15)
-                                                {
-                                                    m_fSteeringOutput=0;		//accuator output for backside_lanefollow
-                                                    m_fAccelerationOutput= SPEED_PARKOUTLEFT ;
-                                                    stop_time = _clock->GetStreamTime();
-                                                }
-                                        else
-                                        {
-                                        if((_clock->GetStreamTime() - stop_time)/1000000 < 1) //time for wait
-                                                {
-                                                        if(m_bDebugModeEnabled) LOG_INFO(cString::Format("Step 1:wait"));
-                                                        m_fSteeringOutput=0;		//accuator output for backside_lanefollow
-                                                        m_fAccelerationOutput= 0;
-														m_bBreak_Light= tTrue;
-                                                }
-                                        else
-                                                {
+									else
+									{
 
-                                                        m_iStateOfParkoutleft=SOP_Leftsteer_front;  // change parking out manuver
-                                                       	m_fDistanceOverall_Start=m_fDistanceOverall;
-                                                        m_fYaw_Start=m_fYaw;
-														m_bBreak_Light= tFalse;
-														m_bTurnLeft_Light= tTrue;
-
-                                                }
-                                        }
-                                }
+										m_iStateOfParkoutright = SOP_Rightsteer_front;  // change parking manuver
+										m_fDistanceOverall_Start = m_fDistanceOverall;
+										m_fcover_dist = DIST_PARKOUTRIGHT;
+										m_fYaw_Start = m_fYaw;
+										m_bBreak_Light = tFalse;
+										m_bTurnRight_Light = tTrue;
+									}
+								}
+							
                         break;
                 }
-        case SOP_Leftsteer_front:
+        case SOP_Rightsteer_front:
                 {
-                         if(m_bDebugModeEnabled) LOG_INFO(cString::Format("Step 2:Leftsteer frontside"));
-                         if(((m_fDistanceOverall-m_fDistanceOverall_Start) < DIST_LEFTturn) /*&& ((m_fYaw-m_fYaw_Start) <= YAW_Diff)*/) // distance for Rightsteer_front
+                         if(m_bDebugModeEnabled) LOG_INFO(cString::Format("Step 2:rightsteer frontside"));
+
+                         if((m_fDistanceOverall-m_fDistanceOverall_Start) < DIST_RIGHTturn ) // distance for rightsteer_front 
                                 {
-                                        m_fSteeringOutput= STEER_LEFTturn;		//accuator output for Rightsteer front
-                                        m_fAccelerationOutput=SPEED_LEFTturn;
+                                        m_fSteeringOutput= STEER_RIGHTturn;		//accuator output for rightsteer frontside
+                                        m_fAccelerationOutput=SPEED_RIGHTturn;
                                         stop_time = _clock->GetStreamTime();
                                 }
                          else
                                 {
                                         if((_clock->GetStreamTime() - stop_time)/1000000 < 1) // time for wait
                                                 {
-                                                        if(m_bDebugModeEnabled) LOG_INFO(cString::Format("Step 2:Leftsteer frontside wait"));
+                                                        if(m_bDebugModeEnabled) LOG_INFO(cString::Format("Step 2:Rightsteer frontside wait"));
                                                         m_fSteeringOutput=0;		//accuator output for wait
                                                         m_fAccelerationOutput=0;
                                                         m_bBreak_Light= tTrue;
-                                                        m_bTurnLeft_Light= tFalse;
+                                                        m_bTurnRight_Light= tFalse;
                                                 }
                                         else
                                                 {
-                                                        m_iStateOfParkoutleft=SOP_Finished;  // change parking manuver
+                                                        m_iStateOfParkoutright=SOP_Finished;  // change parking manuver
                                                         m_fDistanceOverall_Start=m_fDistanceOverall;
                                                         m_fYaw_Start=m_fYaw;
 														m_bBreak_Light= tFalse;
-
-
                                                 }
                                 }
                          break;
@@ -634,29 +618,24 @@ switch(m_iStateOfParkoutleft)
                                 //stop
                         m_bFinished=tTrue;
                         m_bStart=tFalse;
-                        m_bHazard_Light= tFalse;
-                        m_bBack_Light= tFalse;
-                        m_bHead_Light= tFalse;
-                        m_bTurnLeft_Light= tFalse;
-                        m_bTurnRight_Light= tFalse;
-                        m_bBreak_Light= tFalse;
                         stop_time = _clock->GetStreamTime();
                         TransmitFinish();
                         if(m_bDebugModeEnabled) LOG_INFO(cString::Format("Step 5 : sent transmit finish for parking= %d ",m_bFinished));
-                        m_iStateOfParkoutleft=SOP_NOSTART;
+                        m_iStateOfParkoutright=SOP_NOSTART;
                         break;
                 }
         default :
                 {
-                        m_iStateOfParkoutleft=SOP_NOSTART;
+                        m_iStateOfParkoutright=SOP_NOSTART;
                         m_fDistanceOverall_Start=m_fDistanceOverall;
                         if(m_bDebugModeEnabled) LOG_INFO(cString::Format("PARKING default case"));
                 }
 	}
 RETURN_NOERROR;
+
 }
 
-tResult cParkoutleft::TransmitLight()
+tResult cParkoutright::TransmitLight()
 {
         // Create a new MediaSmaple
         cObjectPtr<IMediaSample> pMediaSampleHead_Light;
@@ -664,9 +643,7 @@ tResult cParkoutleft::TransmitLight()
         cObjectPtr<IMediaSample> pMediaSampleHazard_Light;
         cObjectPtr<IMediaSample> pMediaSampleTurnLeft_Light;
         cObjectPtr<IMediaSample> pMediaSampleTurnRight_Light;
-        cObjectPtr<IMediaSample> pMediaSampleBreak_Light;    // never miss calling the parent implementation!!
-
-
+        cObjectPtr<IMediaSample> pMediaSampleBreak_Light;
 
         AllocMediaSample((tVoid**)&pMediaSampleHead_Light);
         AllocMediaSample((tVoid**)&pMediaSampleBack_Light);
@@ -674,6 +651,9 @@ tResult cParkoutleft::TransmitLight()
         AllocMediaSample((tVoid**)&pMediaSampleTurnLeft_Light);
         AllocMediaSample((tVoid**)&pMediaSampleTurnRight_Light);
         AllocMediaSample((tVoid**)&pMediaSampleBreak_Light);
+
+
+
 
 
         // Send the Media Sample Head_Light
@@ -760,40 +740,39 @@ tResult cParkoutleft::TransmitLight()
 
         RETURN_NOERROR;
 }
-
-tResult cParkoutleft::TransmitFinish()
+tResult cParkoutright::TransmitFinish()
 {
 	// Create a new MediaSmaple
-        cObjectPtr<IMediaSample> pMediaSampleParkoutleft_Finish;
-        AllocMediaSample((tVoid**)&pMediaSampleParkoutleft_Finish);
+        cObjectPtr<IMediaSample> pMediaSampleParkoutright_Finish;
+        AllocMediaSample((tVoid**)&pMediaSampleParkoutright_Finish);
 
         // Send the Media Sample
-        cObjectPtr<IMediaSerializer> pSerializerParkoutleft_Finish;
-        m_pDescriptionOutputParkoutleft_Finish->GetMediaSampleSerializer(&pSerializerParkoutleft_Finish);
-        tInt nSizeParkoutleft_Finish = pSerializerParkoutleft_Finish->GetDeserializedSize();
-        pMediaSampleParkoutleft_Finish->AllocBuffer(nSizeParkoutleft_Finish);
-        cObjectPtr<IMediaCoder> pCoderOutputParkoutleft_Finish;
-        m_pDescriptionOutputParkoutleft_Finish->WriteLock(pMediaSampleParkoutleft_Finish, &pCoderOutputParkoutleft_Finish);
-        pCoderOutputParkoutleft_Finish->Set("bValue", (tVoid*)&(m_bFinished));
-        pCoderOutputParkoutleft_Finish->Set("ui32ArduinoTimestamp", (tVoid*)&timestamp);
-        m_pDescriptionOutputParkoutleft_Finish->Unlock(pCoderOutputParkoutleft_Finish);
-        pMediaSampleParkoutleft_Finish->SetTime(_clock->GetStreamTime());
-        m_oOutputParkoutleft_Finish.Transmit(pMediaSampleParkoutleft_Finish);
+        cObjectPtr<IMediaSerializer> pSerializerParkoutright_Finish;
+        m_pDescriptionOutputParkoutright_Finish->GetMediaSampleSerializer(&pSerializerParkoutright_Finish);
+        tInt nSizeParkoutright_Finish = pSerializerParkoutright_Finish->GetDeserializedSize();
+        pMediaSampleParkoutright_Finish->AllocBuffer(nSizeParkoutright_Finish);
+        cObjectPtr<IMediaCoder> pCoderOutputParkoutright_Finish;
+        m_pDescriptionOutputParkoutright_Finish->WriteLock(pMediaSampleParkoutright_Finish, &pCoderOutputParkoutright_Finish);
+        pCoderOutputParkoutright_Finish->Set("bValue", (tVoid*)&(m_bFinished));
+        pCoderOutputParkoutright_Finish->Set("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+        m_pDescriptionOutputParkoutright_Finish->Unlock(pCoderOutputParkoutright_Finish);
+        pMediaSampleParkoutright_Finish->SetTime(_clock->GetStreamTime());
+        m_oOutputParkoutright_Finish.Transmit(pMediaSampleParkoutright_Finish);
 	RETURN_NOERROR;
 }
-tResult cParkoutleft::TransmitOutput(tFloat32 speed,tFloat32 steering, tUInt32 timestamp)
+tResult cParkoutright::TransmitOutput(tFloat32 speed,tFloat32 steering, tUInt32 timestamp)
 {
 
 	//create new media sample
 	cObjectPtr<IMediaSample> pMediaSampleaccelerate;
 	cObjectPtr<IMediaSample> pMediaSamplesteer;
-        //cObjectPtr<IMediaSample> pMediaSampleTurnSignalLeftEnabled;
-        //cObjectPtr<IMediaSample> pMediaSampleTurnSignalRightEnabled;
+	cObjectPtr<IMediaSample> pMediaSampleTurnSignalLeftEnabled;
+	cObjectPtr<IMediaSample> pMediaSampleTurnSignalRightEnabled;
 
 	AllocMediaSample((tVoid**)&pMediaSampleaccelerate);
 	AllocMediaSample((tVoid**)&pMediaSamplesteer);
-        //AllocMediaSample((tVoid**)&pMediaSampleTurnSignalLeftEnabled);
-        //AllocMediaSample((tVoid**)&pMediaSampleTurnSignalRightEnabled);
+	AllocMediaSample((tVoid**)&pMediaSampleTurnSignalLeftEnabled);
+	AllocMediaSample((tVoid**)&pMediaSampleTurnSignalRightEnabled);
 
 	// acceleration
 	cObjectPtr<IMediaSerializer> pSerializeraccelerate;
