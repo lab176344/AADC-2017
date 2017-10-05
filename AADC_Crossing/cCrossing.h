@@ -116,6 +116,10 @@ protected:
 	cOutputPin m_oOutputFinishFlag;
 	cObjectPtr<IMediaTypeDescription> m_pDescFinishFlag;
 
+	// output check traffic
+	cOutputPin m_oOutputStartCheckTraffic;
+	cObjectPtr<IMediaTypeDescription> m_pDescriptionStartCheckTraffic;
+
 	/* MEMBER VARIABLES INPUT*/
 
 	tBool m_bStart;
@@ -189,6 +193,8 @@ protected:
 	tBool m_bTurnSignalLeftEnabled;
 	tBool m_bTurnSignalRightEnabled;
 	tBool m_bFinishFlag;
+
+	tBool m_bStartCheckTraffic;
 
 	// state of turn
 	tInt16 m_iStateOfTurn;
@@ -315,6 +321,8 @@ public:
 	tResult ReadProperties(const tChar* strPropertyName);
 
 	tResult TransmitOutput();
+
+	tResult TransmitStartTraffic(tBool i_start);
 
 
 private: // private methods

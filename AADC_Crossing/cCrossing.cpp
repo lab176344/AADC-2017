@@ -200,6 +200,14 @@ tResult cCrossing::Init(tInitStage eStage, __exception)
 		RETURN_IF_FAILED(m_oEdgePoint.Create("EdgePoint", pTypeSignalEdgePoint, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oEdgePoint));
 
+		// create pin for check traffic for crossing input
+		tChar const * strDescSignalCheckTraffic = pDescManager->GetMediaDescription("tCheckTrafficForCrossing");
+		RETURN_IF_POINTER_NULL(strDescSignalCheckTraffic);
+		cObjectPtr<IMediaType> pTypeSignalCheckTraffic = new cMediaType(0, 0, 0, "tCheckTrafficForCrossing", strDescSignalCheckTraffic, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+		RETURN_IF_FAILED(pTypeSignalCheckTraffic->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescCheckTraffic));
+		RETURN_IF_FAILED(m_oCheckTraffic.Create("CheckTraffic", pTypeSignalCheckTraffic, static_cast<IPinEventSink*> (this)));
+		RETURN_IF_FAILED(RegisterPin(&m_oCheckTraffic));
+
 		//create pin for steering signal output
 		RETURN_IF_FAILED(pTypeSignalValue->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionOutputSteering));
         RETURN_IF_FAILED(m_oOutputSteering.Create("Steering", pTypeSignalValue, static_cast<IPinEventSink*> (this)));
@@ -237,14 +245,14 @@ tResult cCrossing::Init(tInitStage eStage, __exception)
 		RETURN_IF_FAILED(m_oOutputFinishFlag.Create("FinishFlag", pTypeSignalfinishflag, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oOutputFinishFlag));
 
+		//create pin for start check traffic output
+		tChar const * strDescSignalStartCheckTraffic = pDescManager->GetMediaDescription("tBoolSignalValue"); //tBoolSignalValue
+		RETURN_IF_POINTER_NULL(strDescSignalStartCheckTraffic);
+		cObjectPtr<IMediaType> pTypeSignalStartCheckTraffic = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalStartCheckTraffic, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+		RETURN_IF_FAILED(pTypeSignalStartCheckTraffic->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionStartCheckTraffic));
+		RETURN_IF_FAILED(m_oOutputStartCheckTraffic.Create("Overtake", pTypeSignalStartCheckTraffic, static_cast<IPinEventSink*> (this)));
+		RETURN_IF_FAILED(RegisterPin(&m_oOutputStartCheckTraffic));
 
-		// creeate pin for check traffic for crossing
-		tChar const * strDescSignalCheckTraffic = pDescManager->GetMediaDescription("tCheckTrafficForCrossing");
-		RETURN_IF_POINTER_NULL(strDescSignalCheckTraffic);
-		cObjectPtr<IMediaType> pTypeSignalCheckTraffic = new cMediaType(0, 0, 0, "tCheckTrafficForCrossing", strDescSignalCheckTraffic, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
-		RETURN_IF_FAILED(pTypeSignalCheckTraffic->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescCheckTraffic));
-		RETURN_IF_FAILED(m_oCheckTraffic.Create("CheckTraffic", pTypeSignalCheckTraffic, static_cast<IPinEventSink*> (this)));
-		RETURN_IF_FAILED(RegisterPin(&m_oCheckTraffic));
 
     }
     else if (eStage == StageNormal)
@@ -305,6 +313,8 @@ tResult cCrossing::Init(tInitStage eStage, __exception)
 		m_bFinishFlag=tFalse;
 
 		m_iStateOfTurn=SOT_NOSTART;
+
+		m_bStartCheckTraffic=tFalse;
     }
 
     RETURN_NOERROR;
@@ -775,6 +785,9 @@ tResult cCrossing::Maneuver(tInt8 iID, tBool i_bHaveToStop)
 			m_fSteeringOutput=0;
 			m_fAccelerationOutput=0;
 
+			// start checking the traffic
+			TransmitStartTraffic(tTrue);
+
 			if(i_bHaveToStop)
 			{
 				// waittime on stopping line
@@ -856,6 +869,9 @@ tResult cCrossing::TurnRight(tBool bHaveToStop)
 		}
     case SOT_TURN:
 		{
+			// stop checking the traffic
+			TransmitStartTraffic(tFalse);
+
 			m_fSteeringOutput=propSteerRight;
 			m_fAccelerationOutput=speed_curve;
 
@@ -969,6 +985,9 @@ tResult cCrossing::TurnLeft(tBool bHaveToStop)
 		}
     case SOT_TURN:
 		{
+			// stop checking the traffic
+			TransmitStartTraffic(tFalse);
+
 			m_fSteeringOutput=propSteerLeft;
 			m_fAccelerationOutput=speed_curve;
 
@@ -1077,6 +1096,9 @@ tResult cCrossing::GoStraight(tBool bHaveToStop)
 		}
     case SOT_TURN:
 		{
+			// stop checking the traffic
+			TransmitStartTraffic(tFalse);
+
 			m_fSteeringOutput=0;
 			m_fAccelerationOutput=speed_straight;
 			
@@ -1315,6 +1337,29 @@ tResult cCrossing::TransmitOutput()
 	m_pDescFinishFlag->Unlock(pCoderOutputfinishflag);
 	pMediaSamplefinishflag->SetTime(_clock->GetStreamTime());
 	m_oOutputFinishFlag.Transmit(pMediaSamplefinishflag);
+
+	RETURN_NOERROR;
+}
+
+tResult cCrossing::TransmitStartTraffic(tBool i_bStart)
+{
+	//create new media sample
+	cObjectPtr<IMediaSample> pMediaSampleStartCheckTraffic;
+
+	AllocMediaSample((tVoid**)&pMediaSampleStartCheckTraffic);
+
+	// acceleration
+	cObjectPtr<IMediaSerializer> pSerializerStartCheckTraffic;
+	m_pDescriptionOutputAcceleration->GetMediaSampleSerializer(&pSerializerStartCheckTraffic);
+	tInt nSizeStartCheckTraffic = pSerializerStartCheckTraffic->GetDeserializedSize();
+	pMediaSampleStartCheckTraffic->AllocBuffer(nSizeStartCheckTraffic);
+	cObjectPtr<IMediaCoder> pCoderOutputStartCheckTraffic;
+	m_pDescriptionOutputAcceleration->WriteLock(pMediaSampleStartCheckTraffic, &pCoderOutputStartCheckTraffic);
+	pCoderOutputStartCheckTraffic->Set("bValue", (tVoid*)&(i_bStart));
+	pCoderOutputStartCheckTraffic->Set("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+	m_pDescriptionOutputAcceleration->Unlock(pCoderOutputStartCheckTraffic);
+	pMediaSampleStartCheckTraffic->SetTime(_clock->GetStreamTime());
+	m_oOutputAcceleration.Transmit(pMediaSampleStartCheckTraffic);
 
 	RETURN_NOERROR;
 }
