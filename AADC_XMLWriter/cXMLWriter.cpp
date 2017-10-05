@@ -194,30 +194,16 @@ tResult cXMLWriter::OnPinEvent(IPin* pSource, tInt nEventCode, tInt nParam1, tIn
 }
 
 
-tResult cXMLWriter::ProcessInputTrafficSign(IMediaSample* pMediaSampleIn, tTimeStamp tsInputTime)
+tResult cXMLWriter::ProcessInputTrafficSign(IMediaSample* pMediaSample, tTimeStamp tsInputTime)
 {
-	tInt16 i16Id=0;
-	tFloat32 f32x = 0;
-	tFloat32 f32y = 0;
-	tFloat32 f32angle = 0;
-
-	{
-		__adtf_sample_read_lock_mediadescription(m_pDescriptionTrafficSign,pMediaSampleIn,pCoderInput);
-		// get IDs
-		if (!m_TrafficSignInputSet)
-		{
-			pCoderInput->GetID("i16Identifier", m_tsI16id);
-			pCoderInput->GetID("f32x", m_tsF32X);
-			pCoderInput->GetID("f32y", m_tsF32Y);
-			pCoderInput->GetID("f32angle", m_tsF32Angle);
-			m_TrafficSignInputSet=tTrue;
-		}
-		pCoderInput->Get(m_tsI16id, (tVoid*)&i16Id);
-		pCoderInput->Get(m_tsF32X, (tVoid*)&f32x);
-		pCoderInput->Get(m_tsF32Y, (tVoid*)&f32y);
-		pCoderInput->Get(m_tsF32Angle, (tVoid*)&f32angle);
-	}
-
+	cObjectPtr<IMediaCoder> pCoderInput;
+	RETURN_IF_FAILED(m_pDescSpeed->Lock(pMediaSample, &pCoderInput));
+	pCoderInput->Get("i16Identifier", (tVoid*)&m_tsI16id);
+	pCoderInput->Get("f32x", (tVoid*)&m_tsF32X);
+	pCoderInput->Get("f32y", (tVoid*)&m_tsF32Y);
+	pCoderInput->Get("f32angle", (tVoid*)&m_tsF32Angle);
+	m_pDescSpeed->Unlock(pCoderInput);
+	
 	// call DOM functions
 	QDomDocument docDocument("DomDocument");
 	ReadXML(docDocument);
@@ -234,46 +220,24 @@ tResult cXMLWriter::ProcessInputTrafficSign(IMediaSample* pMediaSampleIn, tTimeS
 
 tResult cXMLWriter::ProcessInputParkingSpace(IMediaSample* pMediaSampleIn, tTimeStamp tsInputTime)
 {
-  tInt16 i16Id=0;
-  tFloat32 f32x = 0;
-  tFloat32 f32y = 0;
-  tUInt16 ui16Status = 0;
-
-  {   __adtf_sample_read_lock_mediadescription(m_pDescriptionParkingSpace,pMediaSampleIn,pCoderInput);
-    // get IDs
-    if (!m_ParkingInputSet)
-    {
-      pCoderInput->GetID("i16Identifier", m_parkingI16Id);
-      pCoderInput->GetID("f32x", m_parkingF32X);
-      pCoderInput->GetID("f32y", m_parkingF32Y);
-      pCoderInput->GetID("ui16Status", m_parkingUI16Status);
-      m_ParkingInputSet=tTrue;
-    }
-    pCoderInput->Get(m_parkingI16Id, (tVoid*)&i16Id);
-    pCoderInput->Get(m_parkingF32X, (tVoid*)&f32x);
-    pCoderInput->Get(m_parkingF32Y, (tVoid*)&f32y);
-    pCoderInput->Get(m_parkingUI16Status, (tVoid*)&ui16Status);
-  }
+	cObjectPtr<IMediaCoder> pCoderInput;
+	RETURN_IF_FAILED(m_pDescSpeed->Lock(pMediaSample, &pCoderInput));
+	pCoderInput->Get("i16Identifier", (tVoid*)&m_parkingI16Id);
+	pCoderInput->Get("f32x", (tVoid*)&m_parkingF32X);
+	pCoderInput->Get("f32y", (tVoid*)&m_parkingF32Y);
+	pCoderInput->Get("ui16Status", (tVoid*)&m_parkingUI16Status);
+	m_pDescSpeed->Unlock(pCoderInput);
   //emit SendParkingData(static_cast<int>(i16Id),static_cast<float>(f32x), static_cast<float>(f32y),static_cast<int>(ui16Status));
   RETURN_NOERROR;
 }
 
 tResult cXMLWriter::ProcessInputObstacle(IMediaSample* pMediaSampleIn, tTimeStamp tsInputTime)
 {
-  tFloat32 f32x = 0;
-  tFloat32 f32y = 0;
-  {
-    __adtf_sample_read_lock_mediadescription(m_pDescriptionObstacle,pMediaSampleIn,pCoderInput);
-    // get IDs
-    if (!m_ObstacleInputSet)
-    {
-      pCoderInput->GetID("f32x", m_obstacleF32X);
-      pCoderInput->GetID("f32y", m_obstacleF32Y);
-      m_ObstacleInputSet=tTrue;
-    }
-    pCoderInput->Get(m_obstacleF32X, (tVoid*)&f32x);
-    pCoderInput->Get(m_obstacleF32Y, (tVoid*)&f32y);
-  }
+	cObjectPtr<IMediaCoder> pCoderInput;
+	RETURN_IF_FAILED(m_pDescSpeed->Lock(pMediaSample, &pCoderInput));
+	pCoderInput->Get("f32x", (tVoid*)&m_obstacleF32X);
+	pCoderInput->Get("f32y", (tVoid*)&m_obstacleF32Y);
+	m_pDescSpeed->Unlock(pCoderInput);
   //emit SendObstacleData(static_cast<float>(f32x), static_cast<float>(f32y) );
   RETURN_NOERROR;
 }

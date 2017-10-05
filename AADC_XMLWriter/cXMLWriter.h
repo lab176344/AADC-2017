@@ -116,15 +116,15 @@ protected:
 	
 	//Traffic Sign input
     tBool m_TrafficSignInputSet;
-    tBufferID m_tsI16id,m_tsF32X,m_tsF32Y,m_tsF32Angle;
+    tFloat32 m_tsI16id,m_tsF32X,m_tsF32Y,m_tsF32Angle;
 
     //Parking Input
     tBool m_ParkingInputSet;
-    tBufferID m_parkingI16Id,m_parkingF32X,m_parkingF32Y,m_parkingUI16Status;
+    tFloat32 m_parkingI16Id,m_parkingF32X,m_parkingF32Y,m_parkingUI16Status;
 
     //Obstacle Input
     tBool m_ObstacleInputSet;
-    tBufferID m_obstacleF32X,m_obstacleF32Y;
+    tFloat32 m_obstacleF32X,m_obstacleF32Y;
 
     //Media Description
     cObjectPtr<IMediaTypeDescription> m_pDescriptionTrafficSign;
