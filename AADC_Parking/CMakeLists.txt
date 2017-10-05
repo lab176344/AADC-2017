@@ -13,3 +13,4 @@ adtf_set_folder(${FILTER_NAME} Parking)
 
 # Specify where it should be installed to
 adtf_install_plugin(${FILTER_NAME} ${CMAKE_INSTALL_BINARY})
+#adtf_install_plugin(${FILTER_NAME} ${AADC_INSTALL_DIR})

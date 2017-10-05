@@ -1,0 +1,1033 @@
+/**
+Copyright (c)
+Audi Autonomous Driving Cup. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+3.  All advertising materials mentioning features or use of this software must display the following acknowledgement: ?This product includes software developed by the Audi AG and its contributors for Audi Autonomous Driving Cup.?
+4.  Neither the name of Audi nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS ?AS IS? AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL AUDI AG OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+**********************************************************************
+* $Author:: spiesra $  $Date:: 2017-05-12 09:34:53#$ $Rev:: 63109   $
+**********************************************************************/
+
+#include "stdafx.h"
+#include "cParking.h"
+
+#define DISTANCE_LANE_FOLLOW 			"cParking::DIST_LANEFOLLOW"
+#define SPEED_LANE_FOLLOW 			"cParking::SPEED_LANEFOLLOW"
+
+#define DISTANCE_OUT_FRONT			"cParking::DIST_OUTFRONT"
+#define STEER_OUT_FRONT				"cParking::STEER_OUTFRONT"
+#define SPEED_OUT_FRONT				"cParking::SPEED_OUTFRONT"
+
+#define DISTANCE_IN_BACK			"cParking::DIST_INBACK"
+#define STEER_IN_BACK				"cParking::STEER_INBACK"
+#define SPEED_IN_BACK				"cParking::SPEED_INBACK"
+
+#define DISTANCE_LANEFOLLOW_BACK		"cParking::DIST_LANEFOLLOWBACK"
+#define SPEED_LANEFOLLOW_BACK			"cParking::SPEED_LANEFOLLOWBACK"
+
+/// Create filter shell
+ADTF_FILTER_PLUGIN("Parking", OID_ADTF_PARKING, cParking);
+
+using namespace roadsignIDs;
+
+cParking::cParking(const tChar* __info):cFilter(__info)
+{
+// set properties for lanefollow front
+        SetPropertyFloat(DISTANCE_LANE_FOLLOW,0.7);
+    SetPropertyBool(DISTANCE_LANE_FOLLOW NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(DISTANCE_LANE_FOLLOW NSSUBPROP_DESCRIPTION, "the distance for the lanefollow");
+
+        SetPropertyFloat(SPEED_LANE_FOLLOW,-15);
+    SetPropertyBool(SPEED_LANE_FOLLOW NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(SPEED_LANE_FOLLOW NSSUBPROP_DESCRIPTION, "the speed for the lanefollow");
+
+// set properties for outsteer front
+        SetPropertyFloat(DISTANCE_OUT_FRONT,0.6);
+    SetPropertyBool(DISTANCE_OUT_FRONT NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(DISTANCE_OUT_FRONT NSSUBPROP_DESCRIPTION, "the distance for the steer outside");
+
+        SetPropertyFloat(STEER_OUT_FRONT,-80);
+    SetPropertyBool(STEER_OUT_FRONT NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(STEER_OUT_FRONT NSSUBPROP_DESCRIPTION, "the steer for the steer outside");
+
+        SetPropertyFloat(SPEED_OUT_FRONT,-15);
+    SetPropertyBool(SPEED_OUT_FRONT NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(SPEED_OUT_FRONT NSSUBPROP_DESCRIPTION, "the speed for the steer outside");
+
+// set properties for insteer back
+        SetPropertyFloat(DISTANCE_IN_BACK,0.7);
+    SetPropertyBool(DISTANCE_IN_BACK NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(DISTANCE_IN_BACK NSSUBPROP_DESCRIPTION, "the distance for the steer outside");
+
+        SetPropertyFloat(STEER_IN_BACK,100);
+    SetPropertyBool(STEER_IN_BACK NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(STEER_IN_BACK NSSUBPROP_DESCRIPTION, "the steer for the steer outside");
+
+        SetPropertyFloat(SPEED_IN_BACK,12);
+    SetPropertyBool(SPEED_IN_BACK NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(SPEED_IN_BACK NSSUBPROP_DESCRIPTION, "the speed for the steer outside");
+
+// set property for lane follow back
+        SetPropertyFloat(DISTANCE_LANEFOLLOW_BACK,0.1);
+    SetPropertyBool(DISTANCE_LANEFOLLOW_BACK NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(DISTANCE_LANEFOLLOW_BACK NSSUBPROP_DESCRIPTION, "the distance for the Lanefollow back");
+
+        SetPropertyFloat(SPEED_LANEFOLLOW_BACK,12);
+    SetPropertyBool(SPEED_LANEFOLLOW_BACK NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(SPEED_LANEFOLLOW_BACK NSSUBPROP_DESCRIPTION, "the speed for the Lanefollow back");
+}
+
+
+
+cParking::~cParking()
+{
+
+}
+
+tResult cParking::Init(tInitStage eStage, __exception)
+{
+    // never miss calling the parent implementation!!
+    RETURN_IF_FAILED(cFilter::Init(eStage, __exception_ptr))
+
+    // in StageFirst you can create and register your static pins.
+    if (eStage == StageFirst)
+    {
+        // get a media type for the input pin
+        //cObjectPtr<IMediaType> pInputType;
+        //RETURN_IF_FAILED(AllocMediaType(&pInputType, MEDIA_TYPE_TEMPLATE, MEDIA_SUBTYPE_TEMPLATE, __exception_ptr));
+
+        // create and register the input pin
+        //RETURN_IF_FAILED(m_oInputPin.Create("input_template", pInputType, this));
+        //RETURN_IF_FAILED(RegisterPin(&m_oInputPin));
+
+        // get a media type for the output pin
+        //cObjectPtr<IMediaType> pOutputType;
+        //RETURN_IF_FAILED(AllocMediaType(&pOutputType, MEDIA_TYPE_TEMPLATE, MEDIA_SUBTYPE_TEMPLATE, __exception_ptr));
+
+        // create and register the output pin
+        //RETURN_IF_FAILED(m_oOutputPin.Create("output_template", pOutputType, this));
+        //RETURN_IF_FAILED(RegisterPin(&m_oOutputPin));
+
+        //get description for wheel sensors data pins
+//        tChar const * strDescWheelData = pDescManager->GetMediaDescription("tWheelData");
+//        RETURN_IF_POINTER_NULL(strDescWheelData);
+  //      cObjectPtr<IMediaDescriptionManager> pDescManager;
+
+                cObjectPtr<IMediaDescriptionManager> pDescManager;
+        RETURN_IF_FAILED(_runtime->GetObject(OID_ADTF_MEDIA_DESCRIPTION_MANAGER,IID_ADTF_MEDIA_DESCRIPTION_MANAGER,(tVoid**)&pDescManager,__exception_ptr));
+
+        tChar const * strRoadSign = pDescManager->GetMediaDescription("tRoadSign");
+        RETURN_IF_POINTER_NULL(strRoadSign);
+        cObjectPtr<IMediaType> pTypeRoadSign = new cMediaType(0, 0, 0, "tRoadSign", strRoadSign, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+
+                tChar const * strDescSignalValue = pDescManager->GetMediaDescription("tSignalValue");
+        RETURN_IF_POINTER_NULL(strDescSignalValue);
+        cObjectPtr<IMediaType> pTypeSignalValue = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalValue, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+
+//create pin for start pin input
+                tChar const * strDescSignalstart = pDescManager->GetMediaDescription("tBoolSignalValue");
+                RETURN_IF_POINTER_NULL(strDescSignalstart);
+                cObjectPtr<IMediaType> pTypeSignalstart = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalstart, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+                RETURN_IF_FAILED(pTypeSignalstart->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescStart));
+                RETURN_IF_FAILED(m_oStart.Create("Start", pTypeSignalstart, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oStart));
+//create pin for Front_Image_Slot pin input
+                tChar const * strDescSignalFront_Image_Slot = pDescManager->GetMediaDescription("tBoolSignalValue");
+                RETURN_IF_POINTER_NULL(strDescSignalFront_Image_Slot);
+                cObjectPtr<IMediaType> pTypeSignalFront_Image_Slot = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalFront_Image_Slot, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+                RETURN_IF_FAILED(pTypeSignalstart->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescStart));
+                RETURN_IF_FAILED(m_oFront_Image_Slot.Create("Front Slot Detect", pTypeSignalFront_Image_Slot, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oFront_Image_Slot));
+//create pin for Back_Image_Slot pin input
+                tChar const * strDescSignalBack_Image_Slot = pDescManager->GetMediaDescription("tBoolSignalValue");
+                RETURN_IF_POINTER_NULL(strDescSignalBack_Image_Slot);
+                cObjectPtr<IMediaType> pTypeSignalBack_Image_Slot = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalBack_Image_Slot, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+                RETURN_IF_FAILED(pTypeSignalBack_Image_Slot->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescBack_Image_Slot));
+                RETURN_IF_FAILED(m_oBack_Image_Slot.Create("Back slot Detect", pTypeSignalBack_Image_Slot, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oBack_Image_Slot));
+//create pin for Front_Slot_Distance input
+                tChar const * strDescSignalFront_Slot_Distance = pDescManager->GetMediaDescription("tSignalValue");
+                RETURN_IF_POINTER_NULL(strDescSignalFront_Slot_Distance);
+                cObjectPtr<IMediaType> pTypeSignalFront_Slot_Distance = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalFront_Slot_Distance, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+                RETURN_IF_FAILED(pTypeSignalFront_Slot_Distance->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescFront_Slot_Distance));
+                RETURN_IF_FAILED(m_oFront_Slot_Distance.Create("Front slot Distance", pTypeSignalFront_Slot_Distance, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oFront_Slot_Distance));
+//create pin for Distance over all input
+                tChar const * strDescSignaldistanceoverall = pDescManager->GetMediaDescription("tSignalValue");
+                RETURN_IF_POINTER_NULL(strDescSignaldistanceoverall);
+                cObjectPtr<IMediaType> pTypeSignaldistanceoverall = new cMediaType(0, 0, 0, "tSignalValue", strDescSignaldistanceoverall, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+                RETURN_IF_FAILED(pTypeSignaldistanceoverall->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescdistanceoverall));
+                RETURN_IF_FAILED(m_oDistanceOverall.Create("Distance_Overall", pTypeSignaldistanceoverall, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oDistanceOverall));
+//create pin for Yaw input
+        tChar const * strDescSignalYaw = pDescManager->GetMediaDescription("tSignalValue");
+        RETURN_IF_POINTER_NULL(strDescSignalYaw);
+        cObjectPtr<IMediaType> pTypeSignalYaw = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalYaw, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+        RETURN_IF_FAILED(pTypeSignalYaw->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescYaw));
+        RETURN_IF_FAILED(m_oYaw.Create("Yaw", pTypeSignalYaw, static_cast<IPinEventSink*> (this)));
+        RETURN_IF_FAILED(RegisterPin(&m_oYaw));
+
+//create pin for US Rightside input
+                tChar const * strDescSignalUSRightside = pDescManager->GetMediaDescription("tSignalValue");
+                RETURN_IF_POINTER_NULL(strDescSignalUSRightside);
+                cObjectPtr<IMediaType> pTypeSignalUSRightside = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalUSRightside, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+                RETURN_IF_FAILED(pTypeSignalUSRightside->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescUSRightside));
+                RETURN_IF_FAILED(m_oUSRightside.Create("US_Rightside", pTypeSignalUSRightside, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oUSRightside));
+
+//create pin for US Backright input
+                tChar const * strDescSignalUSBackright = pDescManager->GetMediaDescription("tSignalValue");
+                RETURN_IF_POINTER_NULL(strDescSignalUSBackright);
+                cObjectPtr<IMediaType> pTypeSignalUSBackright = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalUSBackright, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+                RETURN_IF_FAILED(pTypeSignalUSBackright->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescUSBackright));
+                RETURN_IF_FAILED(m_oUSBackright.Create("US_Backright", pTypeSignalUSBackright, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oUSBackright));
+
+//create pin for US Backleft input
+                tChar const * strDescSignalUSBackleft = pDescManager->GetMediaDescription("tSignalValue");
+                RETURN_IF_POINTER_NULL(strDescSignalUSBackleft);
+                cObjectPtr<IMediaType> pTypeSignalUSBackleft = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalUSBackleft, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+                RETURN_IF_FAILED(pTypeSignalUSBackleft->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescUSBackleft));
+                RETURN_IF_FAILED(m_oUSBackleft.Create("US_Backleft", pTypeSignalUSBackleft, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oUSBackleft));
+
+// Output - Lane_follow
+				tChar const * strDescSignalLane_follow = pDescManager->GetMediaDescription("tBoolSignalValue"); //tBoolSignalValue
+				RETURN_IF_POINTER_NULL(strDescSignalLane_follow);
+				cObjectPtr<IMediaType> pTypeSignalLane_follow = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalLane_follow, 	IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+				RETURN_IF_FAILED(pTypeSignalLane_follow->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionOutputLane_follow));
+				RETURN_IF_FAILED(m_oOutputLane_follow.Create("Lane follow", pTypeSignalLane_follow, static_cast<IPinEventSink*> (this)));
+				RETURN_IF_FAILED(RegisterPin(&m_oOutputLane_follow));
+
+// Output - Lane_follow_back
+				tChar const * strDescSignalLane_follow_back = pDescManager->GetMediaDescription("tBoolSignalValue"); //tBoolSignalValue
+				RETURN_IF_POINTER_NULL(strDescSignalLane_follow_back);
+				cObjectPtr<IMediaType> pTypeSignalLane_follow_back = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalLane_follow_back, 	IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+				RETURN_IF_FAILED(pTypeSignalLane_follow_back->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionOutputLane_follow_back));
+				RETURN_IF_FAILED(m_oOutputLane_follow_back.Create("Lane follow back", pTypeSignalLane_follow_back, static_cast<IPinEventSink*> (this)));
+				RETURN_IF_FAILED(RegisterPin(&m_oOutputLane_follow_back));
+
+// Output - Parking_Finish
+				tChar const * strDescSignalParking_Finish = pDescManager->GetMediaDescription("tBoolSignalValue"); //tBoolSignalValue
+				RETURN_IF_POINTER_NULL(strDescSignalParking_Finish);
+				cObjectPtr<IMediaType> pTypeSignalParking_Finish = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalParking_Finish, 	IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+				RETURN_IF_FAILED(pTypeSignalParking_Finish->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionOutputParking_Finish));
+				RETURN_IF_FAILED(m_oOutputParking_Finish.Create("Parking Finish", pTypeSignalParking_Finish, static_cast<IPinEventSink*> (this)));
+				RETURN_IF_FAILED(RegisterPin(&m_oOutputParking_Finish));
+
+//create pin for steering signal output
+                RETURN_IF_FAILED(pTypeSignalValue->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionOutputSteering));
+                RETURN_IF_FAILED(m_oOutputSteering.Create("Steering", pTypeSignalValue, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oOutputSteering));
+
+//create pin for speed signal output
+                tChar const * strDescSignalaccelerate = pDescManager->GetMediaDescription("tSignalValue");
+                RETURN_IF_POINTER_NULL(strDescSignalaccelerate);
+                cObjectPtr<IMediaType> pTypeSignalaccelerate = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalaccelerate, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+                RETURN_IF_FAILED(pTypeSignalaccelerate->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionOutputAcceleration));
+                RETURN_IF_FAILED(m_oOutputAcceleration.Create("accelerate", pTypeSignalaccelerate, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oOutputAcceleration));
+
+//create pin for turnSignalLeftEnabled output
+                tChar const * strDescSignalTurnSignalLeftEnabled = pDescManager->GetMediaDescription("tBoolSignalValue"); //tBoolSignalValue
+                RETURN_IF_POINTER_NULL(strDescSignalTurnSignalLeftEnabled);
+                cObjectPtr<IMediaType> pTypeSignalTurnSignalLeftEnabled = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalTurnSignalLeftEnabled, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+                RETURN_IF_FAILED(pTypeSignalTurnSignalLeftEnabled->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionOutputTurnSignalLeftEnabled));
+                RETURN_IF_FAILED(m_oOutputTurnSignalLeftEnabled.Create("turnSignalLeftEnabled", pTypeSignalTurnSignalLeftEnabled, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oOutputTurnSignalLeftEnabled));
+
+//create pin for turnSignalRightEnabled output
+                tChar const * strDescSignalTurnSignalRightEnabled = pDescManager->GetMediaDescription("tBoolSignalValue"); //tBoolSignalValue
+                RETURN_IF_POINTER_NULL(strDescSignalTurnSignalRightEnabled);
+                cObjectPtr<IMediaType> pTypeSignalTurnSignalRightEnabled = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalTurnSignalRightEnabled, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+                RETURN_IF_FAILED(pTypeSignalTurnSignalRightEnabled->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionOutputTurnSignalRightEnabled));
+                RETURN_IF_FAILED(m_oOutputTurnSignalRightEnabled.Create("turnSignalRightEnabled", pTypeSignalTurnSignalRightEnabled, static_cast<IPinEventSink*> (this)));
+                RETURN_IF_FAILED(RegisterPin(&m_oOutputTurnSignalRightEnabled));
+
+
+    }
+    else if (eStage == StageNormal)
+    {
+        // In this stage you would do further initialisation and/or create your dynamic pins.
+        // Please take a look at the demo_dynamicpin example for further reference.
+    }
+    else if (eStage == StageGraphReady)
+    {
+        // All pin connections have been established in this stage so you can query your pins
+        m_bStart=tFalse;
+        m_bFinished=tFalse;
+        m_bLane_follow= tFalse;
+        m_bLane_follow_back= tFalse;
+        m_bTransmitout= tFalse;
+        m_bTurnSignalLeftEnabled=tFalse;
+        m_bTurnSignalRightEnabled=tFalse;
+        m_iStateOfPark=SOP_NOSTART;
+        m_iStateOfScan=SOP_NOSTART;
+        m_bFront_Slot_Detected=tFalse;
+        m_bnextslot_found=tFalse;
+        m_iParking_slot=0;
+        m_iScanning_slot=0;
+        m_fnextslot_dist_start=0;
+        m_fImage_detection_distance=0;
+        // about their media types and additional meta data.
+        // Please take a look at the demo_imageproc example for further reference.
+    }
+
+    RETURN_NOERROR;
+}
+
+tResult cParking::Shutdown(tInitStage eStage, __exception)
+{
+    // In each stage clean up everything that you initiaized in the corresponding stage during Init.
+    // Pins are an exception:
+    // - The base class takes care of static pins that are members of this class.
+    // - Dynamic pins have to be cleaned up in the ReleasePins method, please see the demo_dynamicpin
+    //   example for further reference.
+
+    if (eStage == StageGraphReady)
+    {
+
+                m_bStart= tFalse;
+
+                // initial values for steering and acceleration
+                m_fAccelerationOutput=0;
+                m_fSteeringOutput=0;
+
+                // init process values
+				m_bStart=tFalse;
+                m_bFinished=tFalse;
+                m_bTransmitout= tFalse;
+                m_bLane_follow= tFalse;
+                m_bLane_follow_back= tFalse;
+                m_bTurnSignalLeftEnabled=tFalse;
+                m_bTurnSignalRightEnabled=tFalse;
+                m_iStateOfPark=SOP_NOSTART;
+                m_iStateOfScan=SOP_NOSTART;
+                m_bFront_Slot_Detected=tFalse;
+                m_bnextslot_found=tFalse;
+                m_iParking_slot=0;
+                m_iScanning_slot=0;
+                m_fnextslot_dist_start=0;
+                m_fImage_detection_distance=0;
+    }
+    else if (eStage == StageNormal)
+    {
+    }
+    else if (eStage == StageFirst)
+    {
+    }
+
+    // call the base class implementation
+    return cFilter::Shutdown(eStage, __exception_ptr);
+}
+
+tResult cParking::PropertyChanged(const char* strProperty)
+{
+        ReadProperties(strProperty);
+        RETURN_NOERROR;
+}
+
+tResult cParking::ReadProperties(const tChar* strPropertyName)
+{
+//check properties for lanefollow front
+        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, DISTANCE_LANE_FOLLOW))
+        {
+                DIST_LANEFOLLOW = static_cast<tFloat32> (GetPropertyFloat(DISTANCE_LANE_FOLLOW));
+        }
+        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, SPEED_LANE_FOLLOW))
+        {
+                SPEED_LANEFOLLOW = static_cast<tFloat32> (GetPropertyFloat(SPEED_LANE_FOLLOW));
+        }
+//check properties for steer out front
+        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, DISTANCE_OUT_FRONT))
+        {
+                DIST_OUTFRONT = static_cast<tFloat32> (GetPropertyFloat(DISTANCE_OUT_FRONT));
+        }
+        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, SPEED_OUT_FRONT))
+        {
+                SPEED_OUTFRONT = static_cast<tFloat32> (GetPropertyFloat(SPEED_OUT_FRONT));
+        }
+        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, STEER_OUT_FRONT))
+        {
+                STEER_OUTFRONT = static_cast<tFloat32> (GetPropertyFloat(STEER_OUT_FRONT));
+        }
+//check property for steer in back
+        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, DISTANCE_IN_BACK))
+        {
+                DIST_INBACK = static_cast<tFloat32> (GetPropertyFloat(DISTANCE_IN_BACK));
+        }
+        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, SPEED_IN_BACK))
+        {
+                SPEED_INBACK = static_cast<tFloat32> (GetPropertyFloat(SPEED_IN_BACK));
+        }
+        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, STEER_IN_BACK))
+        {
+                STEER_INBACK = static_cast<tFloat32> (GetPropertyFloat(STEER_IN_BACK));
+//check property for backlanefollow
+        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, DISTANCE_LANEFOLLOW_BACK))
+        {
+                DIST_LANEFOLLOWBACK = static_cast<tFloat32> (GetPropertyFloat(DISTANCE_LANEFOLLOW_BACK));
+        }
+        if (NULL == strPropertyName || cString::IsEqual(strPropertyName, SPEED_LANEFOLLOW_BACK))
+        {
+                SPEED_LANEFOLLOWBACK = static_cast<tFloat32> (GetPropertyFloat(SPEED_LANEFOLLOW_BACK));
+        }
+        }
+        RETURN_NOERROR;
+}
+
+tResult cParking::OnPinEvent(IPin* pSource,
+                                    tInt nEventCode,
+                                    tInt nParam1,
+                                    tInt nParam2,
+                                    IMediaSample* pMediaSample)
+{
+    // first check what kind of event it is
+    if (nEventCode == IPinEventSink::PE_MediaSampleReceived)
+    {
+        // so we received a media sample, so this pointer better be valid.
+        if (pMediaSample != NULL)
+        {
+                // Input signal at Start
+                if (pSource == &m_oStart)
+                {
+					LOG_INFO(cString::Format("Start bool input"));
+                    cObjectPtr<IMediaCoder> pCoderInput;
+                    RETURN_IF_FAILED(m_pDescStart->Lock(pMediaSample, &pCoderInput));
+                    pCoderInput->Get("bValue", (tVoid*)&m_bStart);
+                    pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+                    m_pDescStart->Unlock(pCoderInput);
+                        LOG_INFO(cString::Format("Start bool input %d", m_bStart));
+                        if(!m_bStart)
+          				{	
+               			stop_time = _clock->GetStreamTime();
+						}
+                }
+				// Input signal at front image slot detection
+				else if (pSource == &m_oFront_Image_Slot)
+                {
+					LOG_INFO(cString::Format("Front_Image_Slot bool input"));
+                    cObjectPtr<IMediaCoder> pCoderInput;
+                    RETURN_IF_FAILED(m_pDescFront_Image_Slot->Lock(pMediaSample, &pCoderInput));
+                    pCoderInput->Get("bValue", (tVoid*)&m_bFront_Slot_Detected);
+                    pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+                    m_pDescFront_Image_Slot->Unlock(pCoderInput);
+
+                }
+				// Input signal at back image slot detection
+				else if (pSource == &m_oBack_Image_Slot)
+                {
+					LOG_INFO(cString::Format("Back_Image_Slot bool input"));
+                    cObjectPtr<IMediaCoder> pCoderInput;
+                    RETURN_IF_FAILED(m_pDescBack_Image_Slot->Lock(pMediaSample, &pCoderInput));
+                    pCoderInput->Get("bValue", (tVoid*)&m_bBack_Slot_Detected);
+                    pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+                    m_pDescBack_Image_Slot->Unlock(pCoderInput);
+
+                }
+
+                // Input signal at Distance Overall
+                else if (pSource == &m_oDistanceOverall)
+                {
+                        cObjectPtr<IMediaCoder> pCoderInput;
+                        RETURN_IF_FAILED(m_pDescdistanceoverall->Lock(pMediaSample, &pCoderInput));
+                        pCoderInput->Get("f32Value", (tVoid*)&m_fDistanceOverall);
+                        pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+                        m_pDescdistanceoverall->Unlock(pCoderInput);
+
+                }
+				// Input signal at front slot distance
+                else if (pSource == &m_oFront_Slot_Distance)
+                {
+                        cObjectPtr<IMediaCoder> pCoderInput;
+                        RETURN_IF_FAILED(m_pDescFront_Slot_Distance->Lock(pMediaSample, &pCoderInput));
+                        pCoderInput->Get("f32Value", (tVoid*)&m_fImage_detection_distance);
+                        pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+                        m_pDescFront_Slot_Distance->Unlock(pCoderInput);
+
+                }
+				else if (pSource == &m_oUSRightside)
+                {
+                        cObjectPtr<IMediaCoder> pCoderInput;
+                        RETURN_IF_FAILED(m_pDescUSRightside->Lock(pMediaSample, &pCoderInput));
+                        pCoderInput->Get("f32Value", (tVoid*)&m_fUSRightside);
+                        pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+                        m_pDescUSRightside->Unlock(pCoderInput);	
+                }
+				else if (pSource == &m_oUSBackright)
+                {
+                        cObjectPtr<IMediaCoder> pCoderInput;
+                        RETURN_IF_FAILED(m_pDescUSBackright->Lock(pMediaSample, &pCoderInput));
+                        pCoderInput->Get("f32Value", (tVoid*)&m_fUSBackright);
+                        pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+                        m_pDescUSBackright->Unlock(pCoderInput);	
+                }
+				else if (pSource == &m_oUSBackleft)
+                {
+                        cObjectPtr<IMediaCoder> pCoderInput;
+                        RETURN_IF_FAILED(m_pDescUSBackleft->Lock(pMediaSample, &pCoderInput));
+                        pCoderInput->Get("f32Value", (tVoid*)&m_fUSBackleft);
+                        pCoderInput->Get("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+                        m_pDescUSBackleft->Unlock(pCoderInput);	
+                }
+
+	  // stop signal
+                if(!m_bStart)
+                {
+                 // LOG_INFO(cString::Format("Start bool false"));
+			m_fAccelerationOutput=0;
+                        m_fSteeringOutput=0;
+			if((_clock->GetStreamTime() - stop_time)/1000000 < 0.1) // time for wait
+				{
+				LOG_INFO(cString::Format("stop signal"));
+				TransmitOutput(m_fSteeringOutput,m_fAccelerationOutput, 0);
+		        }
+                }
+                else if (m_bStart)
+                {
+                LOG_INFO(cString::Format("Start bool true"));
+				stage_park();
+				TransmitOutput(m_fSteeringOutput,m_fAccelerationOutput, 0);
+				TransmitLane_follow();
+				TransmitLane_follow_back();
+                }
+                else
+                {
+                LOG_INFO(cString::Format("no bool"));
+                }
+    }
+
+    RETURN_NOERROR;
+}
+}
+
+tResult cParking::stage_park()
+{
+
+	switch(m_iStateOfPark)
+		{
+                LOG_INFO(cString::Format("PARKING"));
+                LOG_INFO(cString::Format("Parking case: %d",m_iStateOfPark));
+		case SOP_NOSTART:
+			{
+
+				LOG_INFO(cString::Format("Step 0:no start"));
+				m_fSteeringOutput=0;
+				m_fAccelerationOutput=0;
+				//reset finish flag
+				m_bFinished=tFalse;
+				m_bFront_Slot_Detected=tFalse;
+                                m_bnextslot_found=tFalse;
+				//reset Values
+				m_iParking_slot=0;
+				m_iScanning_slot=0;
+				m_fnextslot_dist_start=0;
+				m_fImage_detection_distance=0;
+
+				// change state of turn when StartSignal is true
+				if(m_bStart)
+					{
+						m_iStateOfPark=SOP_Start_step1;
+						//save the first distance and get started
+						m_fDistanceOverall_Start=m_fDistanceOverall;
+                                                m_bFront_Slot_Detected=tFalse;
+                                                m_iScanning_slot=0;
+					}
+				break;
+			}
+		case SOP_Start_step1:
+			{
+				LOG_INFO(cString::Format("Step 1:desired distance"));
+				if(m_fDistanceOverall-m_fDistanceOverall_Start < DIST_LANEFOLLOW) // distance for first_lanefollow
+					{
+                                                LOG_INFO(cString::Format("Step 1:desired distance"));
+						m_fSteeringOutput=0;		//accuator output for backside_lanefollow
+                                                m_fAccelerationOutput= SPEED_LANEFOLLOW ;
+						stop_time = _clock->GetStreamTime();
+					}
+				else
+					{
+
+						if((_clock->GetStreamTime() - stop_time)/1000000 < 1) //time for wait
+							{
+                                                                LOG_INFO(cString::Format("Step 1:wait"));
+								m_fSteeringOutput=0;		//accuator output for backside_lanefollow
+								m_fAccelerationOutput= 0;
+							}
+						else
+							{
+                                                                m_bFront_Slot_Detected=tFalse;
+                                                                stage_scan();
+                                                               // m_iStateOfPark=SOP_Outsteer_front;  // change parking manuver
+                                                               //m_fDistanceOverall_Start=m_fDistanceOverall;
+							}
+					}
+				break;
+			}
+		case SOP_Outsteer_front:
+			{
+				 LOG_INFO(cString::Format("Step 2:outsteer frontside"));
+				 if(m_fDistanceOverall-m_fDistanceOverall_Start < DIST_OUTFRONT) // distance for outsteer_front
+					{
+						m_fSteeringOutput= STEER_OUTFRONT;		//accuator output for outsteer frontside
+						m_fAccelerationOutput=SPEED_OUTFRONT;
+						stop_time = _clock->GetStreamTime();
+					}
+				 else
+					{
+						if((_clock->GetStreamTime() - stop_time)/1000000 < 1) // time for wait
+							{
+                                                                LOG_INFO(cString::Format("Step 2:outsteer frontside wait"));
+								m_fSteeringOutput=0;		//accuator output for wait
+								m_fAccelerationOutput=0;
+							}
+						else
+							{
+								m_iStateOfPark=SOP_Insteer_back;  // change parking manuver
+								m_fDistanceOverall_Start=m_fDistanceOverall;
+							}
+					}
+				 break;
+			}
+		case SOP_Insteer_back:
+			{
+				 LOG_INFO(cString::Format("Step 3:Insteer back"));
+				 if(m_fDistanceOverall-m_fDistanceOverall_Start < DIST_INBACK) // distance for insteer_back
+					{
+						m_fSteeringOutput=STEER_INBACK;		//accuator output for backside_lanefollow
+						m_fAccelerationOutput=SPEED_INBACK;
+						stop_time = _clock->GetStreamTime();
+					}
+				 else
+					{
+						if((_clock->GetStreamTime() - stop_time)/1000000 < 1) // time for wait
+							{
+								m_fSteeringOutput=0;		//accuator output for wait
+								m_fAccelerationOutput=0;
+							}
+						else
+							{
+								m_iStateOfPark=SOP_Back_lanefollow;  // change parking manuver
+								m_fDistanceOverall_Start=m_fDistanceOverall;
+							}
+					}
+				 break;
+			}
+
+		case SOP_Back_lanefollow:
+			{
+				 LOG_INFO(cString::Format("Step 4:backside lanefollow"));
+				 //-------------------------------------------------------------to change--------------------------------------
+				 if(m_fDistanceOverall-m_fDistanceOverall_Start < 0.15) // distance for backside_lanefollow
+					{
+						LOG_INFO(cString::Format("SPEED = %f & ",m_fAccelerationOutput));
+						m_fSteeringOutput=0;               //accuator output for backside_lanefollow
+						m_fAccelerationOutput=12;
+						stop_time = _clock->GetStreamTime();
+					}
+				 //-------------------------------------------------------------------------------------------------------------
+				 else
+					{
+						if((_clock->GetStreamTime() - stop_time)/1000000 < 1) // time for wait
+							{
+								m_fSteeringOutput=0;		//accuator output for wait
+								m_fAccelerationOutput=0;
+							}
+						else
+							{
+								m_iStateOfPark=SOP_Wait;  // change parking manuver
+								m_fDistanceOverall_Start=m_fDistanceOverall;
+                                                                stop_time = _clock->GetStreamTime();
+							}
+					}
+				 break;
+			}
+
+		case SOP_Wait:
+			{
+				 LOG_INFO(cString::Format("Step 5:Wait"));
+                                 if((_clock->GetStreamTime() - stop_time)/1000000 < 3) // distance for backside_lanefollow
+					{
+						m_fSteeringOutput=0;               //accuator output for backside_lanefollow
+						m_fAccelerationOutput=0;
+					}
+				 else
+                                 {
+                                         m_iStateOfPark=SOP_Finished;  // change parking manuver
+                                         m_fDistanceOverall_Start=m_fDistanceOverall;
+                                 }
+				 break;
+			}
+
+		case SOP_Finished:
+			{
+				LOG_INFO(cString::Format("Step 5 : finished"));
+					//stop
+				m_bFinished=tTrue;
+				m_bStart=tFalse;  
+				stop_time = _clock->GetStreamTime();  
+				TransmitFinish();
+				LOG_INFO(cString::Format("Step 5 : sent transmit finish for parking= %d ",m_bFinished));
+                                m_iStateOfPark=SOP_NOSTART;
+				break;
+			}
+                default :
+                        {
+                                m_iStateOfPark=SOP_NOSTART;
+                                m_fDistanceOverall_Start=m_fDistanceOverall;
+                                LOG_INFO(cString::Format("PARKING default case"));
+                        }
+		}
+	RETURN_NOERROR;
+}
+
+tResult cParking::stage_scan()
+{
+//scanning code
+	LOG_INFO(cString::Format("in side scan"));
+	switch(m_iStateOfScan)
+		{
+		case SOS_NOSTART:
+			{
+				LOG_INFO(cString::Format("Step 0:no scanning start"));
+				m_fScan_dist_start= m_fDistanceOverall;
+				m_fScan_distance= 0;
+				m_iStateOfScan=SOS_Start_currentslot;
+                                m_iScanning_slot++; //increment of scanning slot
+                                m_bnextslot_found=tFalse;
+				break;
+			}
+		case SOS_Start_currentslot:
+			{
+				LOG_INFO(cString::Format("Step :current slot"));
+                                if(m_fDistanceOverall-m_fScan_dist_start < 0.5) // distance for scanning area in meter
+					{
+						
+                                            m_bLane_follow=tTrue ;                    //lane follow bool true ----remaining
+					    m_fSteeringOutput=0;		//accuator output for backside_lanefollow
+                                            m_fAccelerationOutput= -15;
+
+
+                                            //----------------------------------------check image detection-------------------------------
+                                            if (m_bFront_Slot_Detected)
+							{
+								LOG_INFO(cString::Format("image detect"));
+								m_fnextslot_dist_start= m_fDistanceOverall; // Image for next slot Detected so save that distance for use
+                                                                m_bnextslot_found=tTrue;
+                                                                m_fImage_detection_distance= 0.4; //if distance provided by image processin-->>edit here
+                                                                m_bFront_Slot_Detected = tFalse; // again reset the bool value for next slot
+                                                         }
+                                            //--------------------------------------------------------------------------------------------
+
+
+                                            //----------------------------------------check object detection in parking slot--------------
+                                            if (m_fUSRightside < 50) //scan slot depth
+                                                    {
+                                                            LOG_INFO(cString::Format(" object detect at = %f ",m_fUSRightside));
+                                                            m_fScan_dist_start= m_fDistanceOverall;  // if object in parking slot detected  ---> no space distance update
+                                                            m_fScan_distance= m_fDistanceOverall-m_fScan_dist_start; // =0
+                                                    }
+                                            else
+                                                    {
+                                                            m_fScan_distance= m_fDistanceOverall-m_fScan_dist_start;  // no object dected ----> space distance calculated
+                                                            LOG_INFO(cString::Format("no object : scan distance = %f",m_fScan_distance));
+                                                    }
+                                            //-------------------------------------------------------------------------------------------
+
+
+                                            //----------------------------------------decision on above detections-----------------------
+                                            if(m_fScan_distance>=0.4)  // if desired space is available
+                                                    {
+
+                                                            LOG_INFO(cString::Format("space_available : scan distance = %f",m_fScan_distance));
+                                                            m_iStateOfScan=SOS_Back_for_manuver; // park_space found so going for manuve
+                                                            m_fScan_dist_start=m_fDistanceOverall;
+                                                            stop_time_scan = _clock->GetStreamTime(); //store time data for waitning in next case
+                                                            m_bLane_follow=tFalse ; // lane follower bool false ----remaining
+
+                                                    }
+                                           else
+                                                    {
+                                                            stop_time_scan = _clock->GetStreamTime(); //store time data for waitning in next case
+                                                    }
+                                        }
+
+                                else
+					{
+
+                                                if((_clock->GetStreamTime() - stop_time_scan)/1000000 < 1)
+                                                        {
+                                                                LOG_INFO(cString::Format("Wait before going to next slot"));
+                                                                m_fSteeringOutput=0;               //accuator output for backside_lanefollow
+                                                                m_fAccelerationOutput=0;
+                                                        }
+                                                else
+                                                        {
+                                                                LOG_INFO(cString::Format( "going to next slot"));
+                                                                m_iStateOfScan=SOS_go_nextslot;  //if no space found so going for next slot
+                                                                stop_time_scan = _clock->GetStreamTime(); //lane follow bool true ----remaining
+                                                        }
+
+					}
+				break;
+			}
+                case SOS_go_nextslot:
+			{
+
+                                if((_clock->GetStreamTime() - stop_time_scan)/1000000 < 1) // distance for backside_lanefollow
+                                        {
+                                                LOG_INFO(cString::Format("Wait before going to next slot"));
+                                                LOG_INFO(cString::Format("if 1 ----> go with image data or go with encoder === &d",m_bnextslot_found));
+                                                m_fSteeringOutput=0;               //accuator output for backside_lanefollow
+                                                m_fAccelerationOutput=0;
+                                        }
+                                else
+                                        {
+                                                LOG_INFO(cString::Format("Step : next slot"));
+                                                if(m_bnextslot_found)
+                                                        {       // below if condition has to change
+                                                                if(m_fDistanceOverall-m_fnextslot_dist_start < m_fImage_detection_distance) // if Distance covered after slot detection is less than Distance reqired for scananig start
+                                                                        {
+                                                                                 m_bLane_follow=tTrue ;//lane follow bool true ----remaining
+                                                                                 m_fSteeringOutput=0;		//accuator output for lanefollow
+                                                                                 m_fAccelerationOutput= SPEED_LANEFOLLOW;
+                                                                        }
+                                                                else
+                                                                        {
+                                                                                m_iScanning_slot++;
+                                                                                m_fScan_dist_start= m_fDistanceOverall;
+                                                                                m_fScan_distance= 0;
+                                                                                stop_time_scan = _clock->GetStreamTime();
+                                                                                m_bnextslot_found= tFalse;
+                                                                                m_iStateOfScan=SOS_Start_currentslot;
+                                                                        }
+                                                        }
+                                                else
+                                                        {
+                                                                if(m_fDistanceOverall-m_fDistanceOverall_Start < 0.5*m_iScanning_slot) // blind distance
+                                                                        {
+                                                                                m_bLane_follow=tTrue ;//lane follow bool true ----remaining
+                                                                                m_fSteeringOutput=0;		//accuator output for lanefollow
+                                                                                m_fAccelerationOutput= SPEED_LANEFOLLOW;
+                                                                        }
+                                                                else
+                                                                        {
+                                                                                m_iScanning_slot++;
+                                                                                m_fScan_dist_start= m_fDistanceOverall;
+                                                                                m_fScan_distance= 0;
+                                                                                stop_time_scan = _clock->GetStreamTime();
+                                                                                m_bnextslot_found= tFalse;
+                                                                                m_iStateOfScan=SOS_Start_currentslot;
+                                                                        }
+                                                        }
+                                         }
+
+				break;
+			}
+		case SOS_Back_for_manuver:
+			{
+                                if((_clock->GetStreamTime() - stop_time_scan)/1000000 < 1) // distance for backside_lanefollow
+                                        {
+                                                LOG_INFO(cString::Format("Wait before going to back"));
+
+                                                m_fSteeringOutput=0;               //accuator output for backside_lanefollow
+                                                m_fAccelerationOutput=0;
+                                        }
+                                else
+                                        {
+                                                LOG_INFO(cString::Format("Step: Back for manuver"));
+                                                if(m_fDistanceOverall-m_fScan_dist_start < m_fScan_distance+0 ) // add offset distancevalue for parking manuver
+                                                        {
+                                                                m_fSteeringOutput=0;		//accuator output for backside_lanefollow
+                                                                m_fAccelerationOutput= -SPEED_LANEFOLLOW;
+                                                        }
+                                                else
+                                                        {
+                                                                m_iStateOfScan=SOS_Finished; // so scan is finished now !!
+                                                                m_iParking_slot=m_iScanning_slot;
+                                                                stop_time_scan = _clock->GetStreamTime();
+                                                        }
+                                         }
+                               break;
+			}
+		case SOS_Finished:
+			{
+				LOG_INFO(cString::Format("Step: Finished"));
+				if(m_iScanning_slot>4) // if all slot scanned 
+					{
+						LOG_INFO(cString::Format("no free space"));
+						m_iStateOfScan=SOS_NOSTART;
+						m_iStateOfPark=SOP_Finished;
+						m_iParking_slot=0;
+						m_iScanning_slot=0;
+                                                stop_time = _clock->GetStreamTime();
+                                                m_fDistanceOverall_Start=m_fDistanceOverall;
+					}
+				if(m_iParking_slot!=0) // if parking slot Found
+					{
+                                                if((_clock->GetStreamTime() - stop_time_scan)/1000000 < 1) // distance for backside_lanefollow
+                                                        {
+                                                                LOG_INFO(cString::Format("Wait before handover to parking manuver"));
+
+                                                                m_fSteeringOutput=0;               //accuator output for backside_lanefollow
+                                                                m_fAccelerationOutput=0;
+                                                        }
+                                                else
+                                                        {
+                                                                m_iStateOfScan=SOS_NOSTART; // scan swich to initial value
+                                                                m_iStateOfPark=SOP_Outsteer_front; // parking manuver change
+                                                                m_fDistanceOverall_Start=m_fDistanceOverall;
+                                                                m_iScanning_slot=0;
+                                                                stop_time_scan = _clock->GetStreamTime();
+                                                                stop_time = _clock->GetStreamTime();
+                                                        }
+                                        }
+				break;
+			}
+		default :
+                    {
+                            m_iStateOfScan=SOS_NOSTART;
+                            m_fScan_dist_start=m_fDistanceOverall;
+                            LOG_INFO(cString::Format("Scanning default case"));
+                    }
+	}
+}
+tResult cParking::TransmitLane_follow()
+{
+	// Create a new MediaSmaple
+        cObjectPtr<IMediaSample> pMediaSampleLane_follow;
+        AllocMediaSample((tVoid**)&pMediaSampleLane_follow);
+
+        // Send the Media Sample
+        cObjectPtr<IMediaSerializer> pSerializerLane_follow;
+        m_pDescriptionOutputLane_follow->GetMediaSampleSerializer(&pSerializerLane_follow);
+        tInt nSizeLane_follow = pSerializerLane_follow->GetDeserializedSize();
+        pMediaSampleLane_follow->AllocBuffer(nSizeLane_follow);
+        cObjectPtr<IMediaCoder> pCoderOutputLane_follow;
+        m_pDescriptionOutputLane_follow->WriteLock(pMediaSampleLane_follow, &pCoderOutputLane_follow);
+        pCoderOutputLane_follow->Set("bValue", (tVoid*)&(m_bLane_follow));
+        pCoderOutputLane_follow->Set("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+        m_pDescriptionOutputLane_follow->Unlock(pCoderOutputLane_follow);
+        pMediaSampleLane_follow->SetTime(_clock->GetStreamTime());
+        m_oOutputLane_follow.Transmit(pMediaSampleLane_follow);
+		RETURN_NOERROR;
+}
+
+tResult cParking::TransmitLane_follow_back()
+{
+	// Create a new MediaSmaple
+        cObjectPtr<IMediaSample> pMediaSampleLane_follow_back;
+        AllocMediaSample((tVoid**)&pMediaSampleLane_follow_back);
+
+        // Send the Media Sample
+        cObjectPtr<IMediaSerializer> pSerializerLane_follow_back;
+        m_pDescriptionOutputLane_follow_back->GetMediaSampleSerializer(&pSerializerLane_follow_back);
+        tInt nSizeLane_follow_back = pSerializerLane_follow_back->GetDeserializedSize();
+        pMediaSampleLane_follow_back->AllocBuffer(nSizeLane_follow_back);
+        cObjectPtr<IMediaCoder> pCoderOutputLane_follow_back;
+        m_pDescriptionOutputLane_follow_back->WriteLock(pMediaSampleLane_follow_back, &pCoderOutputLane_follow_back);
+        pCoderOutputLane_follow_back->Set("bValue", (tVoid*)&(m_bLane_follow_back));
+        pCoderOutputLane_follow_back->Set("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+        m_pDescriptionOutputLane_follow_back->Unlock(pCoderOutputLane_follow_back);
+        pMediaSampleLane_follow_back->SetTime(_clock->GetStreamTime());
+        m_oOutputLane_follow_back.Transmit(pMediaSampleLane_follow_back);
+		RETURN_NOERROR;
+}
+tResult cParking::TransmitFinish()
+{
+	// Create a new MediaSmaple
+        cObjectPtr<IMediaSample> pMediaSampleParking_Finish;
+        AllocMediaSample((tVoid**)&pMediaSampleParking_Finish);
+
+        // Send the Media Sample
+        cObjectPtr<IMediaSerializer> pSerializerParking_Finish;
+        m_pDescriptionOutputParking_Finish->GetMediaSampleSerializer(&pSerializerParking_Finish);
+        tInt nSizeParking_Finish = pSerializerParking_Finish->GetDeserializedSize();
+        pMediaSampleParking_Finish->AllocBuffer(nSizeParking_Finish);
+        cObjectPtr<IMediaCoder> pCoderOutputParking_Finish;
+        m_pDescriptionOutputParking_Finish->WriteLock(pMediaSampleParking_Finish, &pCoderOutputParking_Finish);
+        pCoderOutputParking_Finish->Set("bValue", (tVoid*)&(m_bFinished));
+        pCoderOutputParking_Finish->Set("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+        m_pDescriptionOutputParking_Finish->Unlock(pCoderOutputParking_Finish);
+        pMediaSampleParking_Finish->SetTime(_clock->GetStreamTime());
+        m_oOutputParking_Finish.Transmit(pMediaSampleParking_Finish);
+		RETURN_NOERROR;
+}
+tResult cParking::TransmitOutput(tFloat32 speed,tFloat32 steering, tUInt32 timestamp)
+{
+
+        //create new media sample
+        cObjectPtr<IMediaSample> pMediaSampleaccelerate;
+        cObjectPtr<IMediaSample> pMediaSamplesteer;
+        cObjectPtr<IMediaSample> pMediaSampleTurnSignalLeftEnabled;
+        cObjectPtr<IMediaSample> pMediaSampleTurnSignalRightEnabled;
+
+        AllocMediaSample((tVoid**)&pMediaSampleaccelerate);
+        AllocMediaSample((tVoid**)&pMediaSamplesteer);
+        AllocMediaSample((tVoid**)&pMediaSampleTurnSignalLeftEnabled);
+        AllocMediaSample((tVoid**)&pMediaSampleTurnSignalRightEnabled);
+
+        // acceleration
+        cObjectPtr<IMediaSerializer> pSerializeraccelerate;
+        m_pDescriptionOutputAcceleration->GetMediaSampleSerializer(&pSerializeraccelerate);
+        tInt nSizeaccelerate = pSerializeraccelerate->GetDeserializedSize();
+        pMediaSampleaccelerate->AllocBuffer(nSizeaccelerate);
+        cObjectPtr<IMediaCoder> pCoderOutputaccelerate;
+        m_pDescriptionOutputAcceleration->WriteLock(pMediaSampleaccelerate, &pCoderOutputaccelerate);
+        pCoderOutputaccelerate->Set("f32Value", (tVoid*)&(m_fAccelerationOutput));
+        pCoderOutputaccelerate->Set("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+        m_pDescriptionOutputAcceleration->Unlock(pCoderOutputaccelerate);
+        pMediaSampleaccelerate->SetTime(_clock->GetStreamTime());
+        m_oOutputAcceleration.Transmit(pMediaSampleaccelerate);
+
+        // steering
+        cObjectPtr<IMediaSerializer> pSerializersteer;
+        m_pDescriptionOutputSteering->GetMediaSampleSerializer(&pSerializersteer);
+        tInt nSizesteer = pSerializersteer->GetDeserializedSize();
+        pMediaSamplesteer->AllocBuffer(nSizesteer);
+        cObjectPtr<IMediaCoder> pCoderOutputsteer;
+        m_pDescriptionOutputSteering->WriteLock(pMediaSamplesteer, &pCoderOutputsteer);
+        pCoderOutputsteer->Set("f32Value", (tVoid*)&(m_fSteeringOutput));
+        pCoderOutputsteer->Set("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+        m_pDescriptionOutputSteering->Unlock(pCoderOutputsteer);
+        pMediaSamplesteer->SetTime(_clock->GetStreamTime());
+        m_oOutputSteering.Transmit(pMediaSamplesteer);
+/*
+        // TurnSignalLeftEnabled
+        cObjectPtr<IMediaSerializer> pSerializerTurnSignalLeftEnabled;
+        m_pDescriptionOutputTurnSignalLeftEnabled->GetMediaSampleSerializer(&pSerializerTurnSignalLeftEnabled);
+        tInt nSizeTurnSignalLeftEnabled = pSerializerTurnSignalLeftEnabled->GetDeserializedSize();
+        pMediaSampleTurnSignalLeftEnabled->AllocBuffer(nSizeTurnSignalLeftEnabled);
+        cObjectPtr<IMediaCoder> pCoderOutputTurnSignalLeftEnabled;
+        m_pDescriptionOutputTurnSignalLeftEnabled->WriteLock(pMediaSampleTurnSignalLeftEnabled, &pCoderOutputTurnSignalLeftEnabled);
+        pCoderOutputTurnSignalLeftEnabled->Set("bValue", (tVoid*)&(m_bTurnSignalLeftEnabled));
+        pCoderOutputTurnSignalLeftEnabled->Set("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+        m_pDescriptionOutputTurnSignalLeftEnabled->Unlock(pCoderOutputTurnSignalLeftEnabled);
+        pMediaSampleTurnSignalLeftEnabled->SetTime(_clock->GetStreamTime());
+        m_oOutputAcceleration.Transmit(pMediaSampleTurnSignalLeftEnabled);
+
+        // TurnSignalRightEnabled
+        cObjectPtr<IMediaSerializer> pSerializerTurnSignalRightEnabled;
+        m_pDescriptionOutputTurnSignalRightEnabled->GetMediaSampleSerializer(&pSerializerTurnSignalRightEnabled);
+        tInt nSizeTurnSignalRightEnabled = pSerializerTurnSignalRightEnabled->GetDeserializedSize();
+        pMediaSampleTurnSignalRightEnabled->AllocBuffer(nSizeTurnSignalRightEnabled);
+        cObjectPtr<IMediaCoder> pCoderOutputTurnSignalRightEnabled;
+        m_pDescriptionOutputTurnSignalRightEnabled->WriteLock(pMediaSampleTurnSignalRightEnabled, &pCoderOutputTurnSignalRightEnabled);
+        pCoderOutputTurnSignalRightEnabled->Set("bValue", (tVoid*)&(m_bTurnSignalRightEnabled));
+        pCoderOutputTurnSignalRightEnabled->Set("ui32ArduinoTimestamp", (tVoid*)&timestamp);
+        m_pDescriptionOutputTurnSignalRightEnabled->Unlock(pCoderOutputTurnSignalRightEnabled);
+        pMediaSampleTurnSignalRightEnabled->SetTime(_clock->GetStreamTime());
+        m_oOutputAcceleration.Transmit(pMediaSampleTurnSignalRightEnabled);
+*/
+        RETURN_NOERROR;
+}
+
+
