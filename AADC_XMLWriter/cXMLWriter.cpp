@@ -64,8 +64,9 @@ tResult cXMLWriter::Init(tInitStage eStage, __exception)
     else if (eStage == StageGraphReady)
     {
 
-		/* DOM */
 
+		/* DOM */
+/*
 		QDomDocument docDocument("DomDocument");
 
 		ReadXML(docDocument);
@@ -113,6 +114,7 @@ tResult cXMLWriter::Init(tInitStage eStage, __exception)
 
 		// write QDomDocument to XML
 		WriteToXML(docDocument);
+*/
 
     }
 
@@ -129,21 +131,21 @@ tResult cXMLWriter::CreateInputPins(__exception)
   tChar const * strDescTrafficSign = pDescManager->GetMediaDescription("tTrafficSign");
   RETURN_IF_POINTER_NULL(strDescTrafficSign);
   cObjectPtr<IMediaType> pTypeTrafficSign = new cMediaType(0, 0, 0, "tTrafficSign", strDescTrafficSign, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
-  RETURN_IF_FAILED(pTypeTrafficSign->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionTrafficSign));
+  RETURN_IF_FAILED(pTypeTrafficSign->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescTrafficSign));
   RETURN_IF_FAILED(m_InputTrafficSign.Create("TrafficSign", pTypeTrafficSign, static_cast<IPinEventSink*> (this)));
   RETURN_IF_FAILED(RegisterPin(&m_InputTrafficSign));
 
   tChar const * strDescObstacle = pDescManager->GetMediaDescription("tObstacle");
   RETURN_IF_POINTER_NULL(strDescObstacle);
   cObjectPtr<IMediaType> pTypeObstacle = new cMediaType(0, 0, 0, "tObstacle", strDescObstacle, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
-  RETURN_IF_FAILED(pTypeObstacle->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionObstacle));
+  RETURN_IF_FAILED(pTypeObstacle->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescObstacle));
   RETURN_IF_FAILED(m_InputObstacle.Create("Obstacle", pTypeObstacle, static_cast<IPinEventSink*> (this)));
   RETURN_IF_FAILED(RegisterPin(&m_InputObstacle));
 
   tChar const * strDescParkingSpace = pDescManager->GetMediaDescription("tParkingSpace");
   RETURN_IF_POINTER_NULL(strDescParkingSpace);
   cObjectPtr<IMediaType> pTypeParkingSpace = new cMediaType(0, 0, 0, "tParkingSpace", strDescParkingSpace, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
-  RETURN_IF_FAILED(pTypeParkingSpace->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionParkingSpace));
+  RETURN_IF_FAILED(pTypeParkingSpace->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescParkingSpace));
   RETURN_IF_FAILED(m_InputParkingSpace.Create("ParkingSpace", pTypeParkingSpace, static_cast<IPinEventSink*> (this)));
   RETURN_IF_FAILED(RegisterPin(&m_InputParkingSpace));
 
@@ -197,12 +199,12 @@ tResult cXMLWriter::OnPinEvent(IPin* pSource, tInt nEventCode, tInt nParam1, tIn
 tResult cXMLWriter::ProcessInputTrafficSign(IMediaSample* pMediaSample, tTimeStamp tsInputTime)
 {
 	cObjectPtr<IMediaCoder> pCoderInput;
-	RETURN_IF_FAILED(m_pDescSpeed->Lock(pMediaSample, &pCoderInput));
+	RETURN_IF_FAILED(m_pDescTrafficSign->Lock(pMediaSample, &pCoderInput));
 	pCoderInput->Get("i16Identifier", (tVoid*)&m_tsI16id);
 	pCoderInput->Get("f32x", (tVoid*)&m_tsF32X);
 	pCoderInput->Get("f32y", (tVoid*)&m_tsF32Y);
 	pCoderInput->Get("f32angle", (tVoid*)&m_tsF32Angle);
-	m_pDescSpeed->Unlock(pCoderInput);
+	m_pDescTrafficSign->Unlock(pCoderInput);
 	
 	// call DOM functions
 	QDomDocument docDocument("DomDocument");
@@ -218,26 +220,26 @@ tResult cXMLWriter::ProcessInputTrafficSign(IMediaSample* pMediaSample, tTimeSta
   RETURN_NOERROR;
 }
 
-tResult cXMLWriter::ProcessInputParkingSpace(IMediaSample* pMediaSampleIn, tTimeStamp tsInputTime)
+tResult cXMLWriter::ProcessInputParkingSpace(IMediaSample* pMediaSample, tTimeStamp tsInputTime)
 {
 	cObjectPtr<IMediaCoder> pCoderInput;
-	RETURN_IF_FAILED(m_pDescSpeed->Lock(pMediaSample, &pCoderInput));
+	RETURN_IF_FAILED(m_pDescParkingSpace->Lock(pMediaSample, &pCoderInput));
 	pCoderInput->Get("i16Identifier", (tVoid*)&m_parkingI16Id);
 	pCoderInput->Get("f32x", (tVoid*)&m_parkingF32X);
 	pCoderInput->Get("f32y", (tVoid*)&m_parkingF32Y);
 	pCoderInput->Get("ui16Status", (tVoid*)&m_parkingUI16Status);
-	m_pDescSpeed->Unlock(pCoderInput);
+	m_pDescParkingSpace->Unlock(pCoderInput);
   //emit SendParkingData(static_cast<int>(i16Id),static_cast<float>(f32x), static_cast<float>(f32y),static_cast<int>(ui16Status));
   RETURN_NOERROR;
 }
 
-tResult cXMLWriter::ProcessInputObstacle(IMediaSample* pMediaSampleIn, tTimeStamp tsInputTime)
+tResult cXMLWriter::ProcessInputObstacle(IMediaSample* pMediaSample, tTimeStamp tsInputTime)
 {
 	cObjectPtr<IMediaCoder> pCoderInput;
-	RETURN_IF_FAILED(m_pDescSpeed->Lock(pMediaSample, &pCoderInput));
+	RETURN_IF_FAILED(m_pDescObstacle->Lock(pMediaSample, &pCoderInput));
 	pCoderInput->Get("f32x", (tVoid*)&m_obstacleF32X);
 	pCoderInput->Get("f32y", (tVoid*)&m_obstacleF32Y);
-	m_pDescSpeed->Unlock(pCoderInput);
+	m_pDescObstacle->Unlock(pCoderInput);
   //emit SendObstacleData(static_cast<float>(f32x), static_cast<float>(f32y) );
   RETURN_NOERROR;
 }
@@ -366,7 +368,7 @@ tResult cXMLWriter::WriteToXML(QDomDocument &i_docDocument)
 {
 	// write QDomDocument to XML
 
-	QFile outFile( "/home/aadc/ADTF/configuration_files/roadSigns_test2.xml" );
+	QFile outFile( "/home/aadc/ADTF/configuration_files/roadSigns_test.xml" );
 	if( !outFile.open( QIODevice::WriteOnly | QIODevice::Text ) )
 	{
 		LOG_ERROR(cString::Format("Failed to open file for writing."));

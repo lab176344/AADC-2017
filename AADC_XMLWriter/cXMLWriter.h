@@ -110,9 +110,14 @@ class cXMLWriter : public adtf::cFilter
 protected:
 
 	// Input pins
-    cInputPin m_InputTrafficSign;
-    cInputPin m_InputObstacle;
-    cInputPin m_InputParkingSpace;
+	cInputPin m_InputTrafficSign;
+	cObjectPtr<IMediaTypeDescription> m_pDescTrafficSign;
+
+	cInputPin m_InputObstacle;
+	cObjectPtr<IMediaTypeDescription> m_pDescObstacle;
+
+	cInputPin m_InputParkingSpace;
+	cObjectPtr<IMediaTypeDescription> m_pDescParkingSpace;
 	
 	//Traffic Sign input
     tBool m_TrafficSignInputSet;
@@ -125,11 +130,6 @@ protected:
     //Obstacle Input
     tBool m_ObstacleInputSet;
     tFloat32 m_obstacleF32X,m_obstacleF32Y;
-
-    //Media Description
-    cObjectPtr<IMediaTypeDescription> m_pDescriptionTrafficSign;
-    cObjectPtr<IMediaTypeDescription> m_pDescriptionObstacle;
-    cObjectPtr<IMediaTypeDescription> m_pDescriptionParkingSpace;
 
 	tResult CreateInputPins(__exception = NULL);
 
