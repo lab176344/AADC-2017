@@ -250,7 +250,7 @@ tResult cCrossing::Init(tInitStage eStage, __exception)
 		RETURN_IF_POINTER_NULL(strDescSignalStartCheckTraffic);
 		cObjectPtr<IMediaType> pTypeSignalStartCheckTraffic = new cMediaType(0, 0, 0, "tBoolSignalValue", strDescSignalStartCheckTraffic, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
 		RETURN_IF_FAILED(pTypeSignalStartCheckTraffic->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionStartCheckTraffic));
-		RETURN_IF_FAILED(m_oOutputStartCheckTraffic.Create("Overtake", pTypeSignalStartCheckTraffic, static_cast<IPinEventSink*> (this)));
+		RETURN_IF_FAILED(m_oOutputStartCheckTraffic.Create("Start Check Traffic", pTypeSignalStartCheckTraffic, static_cast<IPinEventSink*> (this)));
 		RETURN_IF_FAILED(RegisterPin(&m_oOutputStartCheckTraffic));
 
 
@@ -1350,16 +1350,16 @@ tResult cCrossing::TransmitStartTraffic(tBool i_bStart)
 
 	// acceleration
 	cObjectPtr<IMediaSerializer> pSerializerStartCheckTraffic;
-	m_pDescriptionOutputAcceleration->GetMediaSampleSerializer(&pSerializerStartCheckTraffic);
+	m_pDescriptionStartCheckTraffic->GetMediaSampleSerializer(&pSerializerStartCheckTraffic);
 	tInt nSizeStartCheckTraffic = pSerializerStartCheckTraffic->GetDeserializedSize();
 	pMediaSampleStartCheckTraffic->AllocBuffer(nSizeStartCheckTraffic);
 	cObjectPtr<IMediaCoder> pCoderOutputStartCheckTraffic;
-	m_pDescriptionOutputAcceleration->WriteLock(pMediaSampleStartCheckTraffic, &pCoderOutputStartCheckTraffic);
+	m_pDescriptionStartCheckTraffic->WriteLock(pMediaSampleStartCheckTraffic, &pCoderOutputStartCheckTraffic);
 	pCoderOutputStartCheckTraffic->Set("bValue", (tVoid*)&(i_bStart));
 	pCoderOutputStartCheckTraffic->Set("ui32ArduinoTimestamp", (tVoid*)&timestamp);
-	m_pDescriptionOutputAcceleration->Unlock(pCoderOutputStartCheckTraffic);
+	m_pDescriptionStartCheckTraffic->Unlock(pCoderOutputStartCheckTraffic);
 	pMediaSampleStartCheckTraffic->SetTime(_clock->GetStreamTime());
-	m_oOutputAcceleration.Transmit(pMediaSampleStartCheckTraffic);
+	m_oOutputStartCheckTraffic.Transmit(pMediaSampleStartCheckTraffic);
 
 	RETURN_NOERROR;
 }
