@@ -139,6 +139,26 @@ protected:
         cOutputPin m_oOutputBreak_Light;
         cObjectPtr<IMediaTypeDescription> m_pDescriptionOutputBreak_Light;
 
+		////*****Maps****//////
+		/*! Input pin for the position data */
+		cInputPin m_InputPostion;
+		//Position input
+		tBool m_PosInputSet;
+		tFloat32 m_szF32X, m_szF32Y, m_szF32Radius, m_szF32Speed, m_szF32Heading;	// add this in Scanning Code
+		//Media Description
+		cObjectPtr<IMediaTypeDescription> m_pDescriptionPos;
+
+		// input first heading angle
+		cInputPin   m_oInputHeadingAngle;
+		cObjectPtr<IMediaTypeDescription> m_pDescHeadingAngle;
+
+		// Output pins for parking map visualization
+		cOutputPin m_InputParkingSpace;
+		cObjectPtr<IMediaTypeDescription> m_pDescriptionParkingSpace;			// add this in Scanning Code
+		//Parking Input
+		tBool m_ParkingInputSet;
+		tInt16 m_parkingI16Id; tFloat32 m_parkingF32X, m_parkingF32Y; tUInt16 m_parkingUI16Status;
+
 
         /* MEMBER VARIABLES INPUT*/
 
@@ -183,10 +203,15 @@ protected:
         tInt16 m_iParking_slot;
         tInt16 m_iStateOfPark;
         tInt16 m_iStateOfScan;
+        tFloat32 m_fposx;
+        tFloat32 m_fposy;
         tFloat32 m_fLine_distance;
+		// first heading angle
+		tFloat32 m_fFirstHeadingAngle;
 
         tFloat32 m_fback_coverdist;
         tFloat32 m_fOrientation2StopLine;
+        tFloat32 m_fOrientation2parkLine;
 
 	enum StateOfParkEnums{
         SOP_NOSTART = 0,
@@ -205,6 +230,7 @@ protected:
         SOS_go_nextslot,
         SOS_Back_for_manuver,
         SOS_Set_for_manuver,
+        SOS_Back_for_scan,
         SOS_Finished      
     };
 	// time stamp
@@ -287,6 +313,9 @@ protected:
                 tResult TransmitOutput(tFloat32 speed,tFloat32 steering, tUInt32 timestamp);
                 tResult TransmitFinish();
                 tResult TransmitLight();
+                tResult computepose();
+                tResult ProcessInputPosition(IMediaSample* pMediaSampleIn, tTimeStamp tsInputTime); // add this in Scanning Code
+                tResult SendParkingData(); // add this in Scanning Code
         private:
 
                 // Properties

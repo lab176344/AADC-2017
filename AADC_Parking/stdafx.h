@@ -17,7 +17,8 @@ THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS “AS IS” AND ANY EXPRES
 **********************************************************************/
 #ifndef __STD_INCLUDES_HEADER
 #define __STD_INCLUDES_HEADER
-
+#include <cmath>
+#define _USE_MATH_DEFINES
 #include <adtf_plugin_sdk.h>
 using namespace adtf;
 #include <aadc_roadSign_enums.h>
