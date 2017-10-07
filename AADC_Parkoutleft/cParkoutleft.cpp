@@ -512,14 +512,14 @@ switch(m_iStateOfParkoutleft)
                                         m_fcover_dist = DIST_PARKOUTLEFT;
                                         if (m_bLine_detection && m_fLine_distance >80 && m_fLine_distance < 100)
                                         {
-                                                m_fcover_dist = (m_fLine_distance/100)-0.65;
+                                                m_fcover_dist = (m_fLine_distance/100)-0.45;
                                                 LOG_INFO(cString::Format("cover distance by farline"));
 
                                                 m_bLine_detection = tFalse;
                                         }
                                         else if (m_bLine_detection && m_fLine_distance <70)
                                         {
-                                                m_fcover_dist = (m_fLine_distance / 100)-0.15;
+                                                m_fcover_dist = (m_fLine_distance / 100)-0.1;
                                                  LOG_INFO(cString::Format("cover distance by midline"));
                                                 m_bLine_detection = tFalse;
                                         }
