@@ -108,6 +108,12 @@ protected:
   	tFloat32 m_szF32X,m_szF32Y,m_szF32Radius,m_szF32Speed,m_szF32Heading;	// add this in Scanning Code
 	//Media Description
    	cObjectPtr<IMediaTypeDescription> m_pDescriptionPos;
+
+	// input first heading angle
+	cInputPin   m_oInputHeadingAngle;
+	cObjectPtr<IMediaTypeDescription> m_pDescHeadingAngle;
+
+
 	
 	// Output pins for parking map visualization
 
@@ -115,7 +121,7 @@ protected:
 	cObjectPtr<IMediaTypeDescription> m_pDescriptionParkingSpace;			// add this in Scanning Code
 	//Parking Input
 	tBool m_ParkingInputSet;
-	tBufferID m_parkingI16Id,m_parkingF32X,m_parkingF32Y,m_parkingUI16Status;
+	tInt16 m_parkingI16Id; tFloat32 m_parkingF32X, m_parkingF32Y;tUInt16 m_parkingUI16Status;
 
 
     /*! output pins */
@@ -175,6 +181,8 @@ protected:
         tFloat32 m_fposx;
         tFloat32 m_fposy;
         tFloat32 m_fOrientation2StopLine;
+		// first heading angle
+		tFloat32 m_fFirstHeadingAngle;
 	tFloat32 FirstHeading1;
 	enum StateOfScanEnums{
         SOS_NOSTART = 0,

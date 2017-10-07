@@ -172,13 +172,21 @@ tResult cScanning::Init(tInitStage eStage, __exception)
 			  RETURN_IF_FAILED(m_InputPostion.Create("Position", pTypePos, static_cast<IPinEventSink*> (this)));
 			  RETURN_IF_FAILED(RegisterPin(&m_InputPostion));
 
-//output pin for traffic update
+//output pin for parking space update
 			  tChar const * strDescParkingSpace = pDescManager->GetMediaDescription("tParkingSpace");
 			  RETURN_IF_POINTER_NULL(strDescParkingSpace);
 			  cObjectPtr<IMediaType> pTypeParkingSpace = new cMediaType(0, 0, 0, "tParkingSpace", strDescParkingSpace, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
 			  RETURN_IF_FAILED(pTypeParkingSpace->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescriptionParkingSpace));
 			  RETURN_IF_FAILED(m_InputParkingSpace.Create("ParkingSpace", pTypeParkingSpace, static_cast<IPinEventSink*> (this)));
 			  RETURN_IF_FAILED(RegisterPin(&m_InputParkingSpace));
+
+			  // create pin for heading angle
+			  tChar const * strDescSignalHeadingAngle = pDescManager->GetMediaDescription("tSignalValue");
+			  RETURN_IF_POINTER_NULL(strDescSignalHeadingAngle);
+			  cObjectPtr<IMediaType> pTypeSignalHeadingAngle = new cMediaType(0, 0, 0, "tSignalValue", strDescSignalHeadingAngle, IMediaDescription::MDF_DDL_DEFAULT_VERSION);
+			  RETURN_IF_FAILED(pTypeSignalHeadingAngle->GetInterface(IID_ADTF_MEDIA_TYPE_DESCRIPTION, (tVoid**)&m_pDescHeadingAngle));
+			  RETURN_IF_FAILED(m_oInputHeadingAngle.Create("Heading Angle", pTypeSignalHeadingAngle, static_cast<IPinEventSink*> (this)));
+			  RETURN_IF_FAILED(RegisterPin(&m_oInputHeadingAngle));
     }
     else if (eStage == StageNormal)
     {
@@ -293,17 +301,13 @@ tResult cScanning::PropertyChanged(const char* strProperty)
 
 tResult cScanning::computepose()
 {
-	 if(!FirstHeadingDetected && m_szF32Heading!=0)
- 	{
-	FirstHeading1=m_szF32Heading;
-	FirstHeadingDetected = tTrue;
-	LOG_INFO(cString::Format("First Heading %f From car %f",FirstHeading1,m_szF32Heading));
- 	}
-	tFloat32 m_angle_change=FirstHeading1-m_szF32Heading;
+	
+	 tFloat32 m_angle_change = m_fFirstHeadingAngle - m_szF32Heading;
         m_parkingF32X = m_fposx*std::cos(m_angle_change)-m_fposy*std::sin(m_angle_change);
         m_parkingF32Y = m_fposy*std::cos(m_angle_change)+m_fposx*std::sin(m_angle_change);
 
 	LOG_INFO(cString::Format("Park X %f Park Y %f Angle change %f",m_parkingF32X,m_parkingF32Y,m_angle_change));
+        RETURN_NOERROR;
 }
 tResult cScanning::ReadProperties(const tChar* strPropertyName)
 {
@@ -382,6 +386,14 @@ tResult cScanning::OnPinEvent(IPin* pSource,
                         m_pDescLane_steer->Unlock(pCoderInput);
 
                 }
+
+				else if (pSource == &m_oInputHeadingAngle)
+				{
+					cObjectPtr<IMediaCoder> pCoderInput;
+					RETURN_IF_FAILED(m_pDescHeadingAngle->Lock(pMediaSample, &pCoderInput));
+					pCoderInput->Get("f32Value", (tVoid*)&m_fFirstHeadingAngle);
+					m_pDescHeadingAngle->Unlock(pCoderInput);
+				}
 				else if (pSource == &m_oInputUSStruct)
 				{
 					cObjectPtr<IMediaCoder> pCoderInput;
@@ -539,9 +551,23 @@ tResult cScanning::stage_scan()
                                                 else
                                                 {
 
-                                                        m_iStateOfScan=SOS_Reach_slot;
-                                                        m_fDistanceOverall_Start=m_fDistanceOverall;
-                                                        stop_time = _clock->GetStreamTime(); //store time data for waitning in next case
+                                                    m_bFront_Slot_Detected = tFalse;
+                                                    m_iStateOfScan = SOS_Start_currentslot;
+                                                    m_fScan_dist_start= m_fDistanceOverall;
+                                                    m_fnextslot_dist_start= m_fDistanceOverall;
+                                                    m_fslot_space_start=m_fDistanceOverall;
+                                                    m_fScan_distance= 0;
+                                                    stop_time = _clock->GetStreamTime(); //store time data for waitning in next case
+                                                    m_iScanning_slot++; //increment of scanning slot
+                                                    m_fSlot_Length=DIST_SCAN_SLOTLENGHT;
+                                                    m_bFree_space_by_sideUS = tFalse;
+                                                    m_bFree_space_by_frontUS = m_bnext_slot_freespace;
+                                                    stop_time = _clock->GetStreamTime(); //store time data for waitning in next case
+                                                    m_fposx = 0; //parking spot update if no spot detection
+                                                    m_fposy = 0;
+                                                    computepose();
+                                                    m_parkingF32X = m_szF32X + m_parkingF32X;
+                                                    m_parkingF32Y = m_szF32Y + m_parkingF32Y;
 
                                                 }
 
@@ -560,8 +586,8 @@ tResult cScanning::stage_scan()
                                stop_time = _clock->GetStreamTime();
                                                            if ((m_fcover_dist - (m_fDistanceOverall - m_fDistanceOverall_Start)) <= 0.5)
 							   {
-                                                               m_fmax_threshold = 45 + (105* (m_fcover_dist - (m_fDistanceOverall - m_fDistanceOverall_Start))); // detection range decresing as per going furture
-                                                               m_fmin_threshold = 5 + (105* (m_fcover_dist - (m_fDistanceOverall - m_fDistanceOverall_Start)));
+                                                               m_fmax_threshold = 30 + (102* (m_fcover_dist - (m_fDistanceOverall - m_fDistanceOverall_Start))); // detection range decresing as per going furture
+                                                               m_fmin_threshold = 3 + (102* (m_fcover_dist - (m_fDistanceOverall - m_fDistanceOverall_Start)));
                                                                LOG_INFO(cString::Format("1st slot scanning bz front max threshold = %f & min threshold = %f",m_fmax_threshold,m_fmin_threshold));
 								   if ((m_fUSFrontRightside <= m_fmax_threshold && m_fUSFrontRightside >= m_fmin_threshold) || (m_fUSCenterRight <= m_fmax_threshold && m_fUSCenterRight >= m_fmin_threshold))
 								   {
@@ -643,8 +669,8 @@ tResult cScanning::stage_scan()
 
                                     m_fSteeringOutput = m_fLane_steer;		//accuator output
                                     m_fAccelerationOutput = SPEED_LANEFOLLOW;
-                                                                        m_fmax_threshold = 45 + (102*(m_fSlot_Length- (m_fDistanceOverall - m_fnextslot_dist_start))); // detection range decrtesing as per going furture
-                                                                        m_fmin_threshold = 5 + (102*(m_fSlot_Length- (m_fDistanceOverall - m_fnextslot_dist_start)));
+                                                                        m_fmax_threshold = 30 + (102*(m_fSlot_Length- (m_fDistanceOverall - m_fnextslot_dist_start))); // detection range decrtesing as per going furture
+                                                                        m_fmin_threshold = 3 + (102*(m_fSlot_Length- (m_fDistanceOverall - m_fnextslot_dist_start)));
 
                                     //----------------------------------------object detection in current parking slot--------------
                                     if (m_fUSRightside < ((DIST_SCAN_SLOTDEPTH)*100)) //scan slot depth
@@ -661,7 +687,7 @@ tResult cScanning::stage_scan()
 									if ((m_fUSFrontRightside <= m_fmax_threshold && m_fUSFrontRightside >= m_fmin_threshold) || (m_fUSCenterRight <= m_fmax_threshold && m_fUSCenterRight >= m_fmin_threshold))
 											{
 												m_bnext_slot_freespace = tFalse;
-												LOG_INFO(cString::Format(" : scan distance = %f",m_fScan_distance));
+												
 
 											}
 									//----------------------------------------------------------------------------------------------
@@ -671,7 +697,7 @@ tResult cScanning::stage_scan()
 
                                                                 if(m_bDebugModeEnabled) LOG_INFO(cString::Format("space_available : scan distance = %f",m_fScan_distance));
                                                                 m_iParking_slot=m_iScanning_slot;
-								m_bFree_space_by_sideUS = tTrue;
+																m_bFree_space_by_sideUS = tTrue;
                                                                 m_fScan_dist_start=m_fDistanceOverall;
                                                                 stop_time = _clock->GetStreamTime(); //store time data for waitning in next case
 
@@ -701,7 +727,7 @@ tResult cScanning::stage_scan()
 									m_parkingI16Id = m_iScanning_slot;
 									if (m_bFree_space_by_sideUS && m_bFree_space_by_frontUS) m_parkingUI16Status = 1;
 									else m_parkingUI16Status = 0;
-                                                                        SendParkingData();
+                                    SendParkingData();
 
                                     if (m_iScanning_slot <= 3) // if parking available slot are 4
                                            {
@@ -746,6 +772,8 @@ tResult cScanning::stage_scan()
                                         m_iStateOfScan = SOS_Start_currentslot;
                                         m_fSlot_Length = DIST_SCAN_SLOTLENGHT;
                                         m_bFree_space_by_frontUS = m_bnext_slot_freespace; // transfer the detection of next slot to current slot
+					m_bFree_space_by_sideUS = tFalse;
+
 
 
                                  }
@@ -769,6 +797,14 @@ tResult cScanning::stage_scan()
                                         m_fDistanceOverall_Start=m_fDistanceOverall;
                                         m_bnext_slot_freespace = tTrue;
                                         m_bFree_space_by_frontUS = tTrue;
+                                        m_fposx=0; //parking spot update
+                                        m_fposy=0;
+                                        computepose();
+                                        m_parkingF32X = 0;
+                                        m_parkingF32Y = 0;
+                                        m_parkingI16Id = 0;
+                                        m_parkingUI16Status = 0;
+                                        SendParkingData();
 
 
             break;
@@ -862,7 +898,7 @@ tResult cScanning::SendParkingData() // add this in Scanning Code
 		pCoderOutputTraffic->Set("ui16Status", (tVoid*)&(m_parkingUI16Status));
         m_pDescriptionOutputSteering->Unlock(pCoderOutputTraffic);
         pMediaSampleTraffic->SetTime(_clock->GetStreamTime());
-        m_oOutputSteering.Transmit(pMediaSampleTraffic);
+		m_InputParkingSpace.Transmit(pMediaSampleTraffic);
 
         RETURN_NOERROR;
 }
