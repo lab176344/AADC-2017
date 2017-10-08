@@ -18,6 +18,8 @@ THIS SOFTWARE IS PROVIDED BY AUDI AG AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR
 #include "stdafx.h"
 #include "cXMLWriter.h"
 
+#define TOLERANCE_X		"cXMLWriter::tolerance_x"
+#define TOLERANCE_Y		"cXMLWriter::tolerance_y"
 
 // define the ADTF property names to avoid errors
 ADTF_FILTER_PLUGIN(ADTF_FILTER_DESC,
@@ -28,6 +30,13 @@ ADTF_FILTER_PLUGIN(ADTF_FILTER_DESC,
 
 cXMLWriter::cXMLWriter(const tChar* __info) : cFilter(__info)
 {
+	SetPropertyFloat(TOLERANCE_X,2);
+    SetPropertyBool(TOLERANCE_X NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(TOLERANCE_X NSSUBPROP_DESCRIPTION, "position tolerance in X to identify a traffic sign");
+	
+	SetPropertyFloat(TOLERANCE_Y,2);
+    SetPropertyBool(TOLERANCE_Y NSSUBPROP_ISCHANGEABLE,tTrue);
+    SetPropertyStr(TOLERANCE_Y NSSUBPROP_DESCRIPTION, "position tolerance in Y to identify a traffic sign");
 }
 
 cXMLWriter::~cXMLWriter()
@@ -63,10 +72,30 @@ tResult cXMLWriter::Init(tInitStage eStage, __exception)
 
     else if (eStage == StageGraphReady)
     {
-
-
-		/* DOM */
 /*
+		QDomDocument docDocument("DomDocument");
+
+		ReadXML(docDocument);
+
+		QDomElement docElem = docDocument.documentElement();
+
+		DomDeleteElement(docDocument, 11, 19);
+
+		// add a new element to DOM
+		QString str = "roadSign";
+		DomAddElement(docDocument, docElem, str, 27, 10.0, 19.0, 1.0, 91);
+
+		DomAddElement(docDocument, docElem, str, 28, 11.0, 19.0, 1.0, 91);
+
+		DomAddElement(docDocument, docElem, str, 27, 12.0, 19.0, 1.0, 91);
+
+
+
+		// write QDomDocument to XML
+		WriteToXML(docDocument);
+
+		// DOM
+
 		QDomDocument docDocument("DomDocument");
 
 		ReadXML(docDocument);
@@ -162,6 +191,25 @@ tResult cXMLWriter::Shutdown(tInitStage eStage, ucom::IException** __exception_p
     return cFilter::Shutdown(eStage, __exception_ptr);
 }
 
+tResult cXMLWriter::PropertyChanged(const char* strProperty)
+{
+	ReadProperties(strProperty);
+	RETURN_NOERROR;
+}
+		
+tResult cXMLWriter::ReadProperties(const tChar* strPropertyName)
+{
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, TOLERANCE_X))
+	{
+		propToleranceX = static_cast<tFloat32> (GetPropertyFloat(TOLERANCE_X));
+	}
+	if (NULL == strPropertyName || cString::IsEqual(strPropertyName, TOLERANCE_Y))
+	{
+		propToleranceY = static_cast<tFloat32> (GetPropertyFloat(TOLERANCE_Y));
+	}
+	RETURN_NOERROR;
+}
+
 tResult cXMLWriter::OnPinEvent(IPin* pSource, tInt nEventCode, tInt nParam1, tInt nParam2, IMediaSample* pMediaSample)
 {
 		RETURN_IF_POINTER_NULL(pMediaSample);
@@ -209,13 +257,25 @@ tResult cXMLWriter::ProcessInputTrafficSign(IMediaSample* pMediaSample, tTimeSta
 	// call DOM functions
 	QDomDocument docDocument("DomDocument");
 	ReadXML(docDocument);
-	QDomElement docElem = docDocument.documentElement();
-	QString str = "roadSign";
-	// check and change roadsign
-	CheckIfTrafficSignExistInXML(docDocument, docElem, m_tsI16id, m_tsF32X, m_tsF32Y, 1.0, m_tsF32Angle);
+	
+	// if ID is -1, the traffic sign has to be deleted
+	if(m_tsI16id==-1)
+	{
+		DomDeleteElement(docDocument, m_tsF32X, m_tsF32Y);
+		
+	}
+	// else we have to check if the traffic sign is new or has replaced an other traffic sign
+	else
+	{
+		QDomElement docElem = docDocument.documentElement();
+		QString str = "roadSign";
+		// check and change roadsign
+		CheckIfTrafficSignExistInXML(docDocument, docElem, m_tsI16id, m_tsF32X, m_tsF32Y, 1.0, m_tsF32Angle);
+	}
+
 	// write QDomDocument to XML
 	WriteToXML(docDocument);
-	
+		
 
   RETURN_NOERROR;
 }
@@ -265,7 +325,7 @@ tResult cXMLWriter::CheckIfTrafficSignExistInXML(QDomDocument &io_domDoc, QDomEl
 		//LOG_INFO(cString::Format("X %f i_fX %f  Y %f i_fY %f", X , i_fX ,  Y , i_fY));
 
 		// traffic sign in a nearby area of an existing traffic sign
-		if( ( (X>=i_fX-2) && (X<=i_fX+2) )  && ( (Y>=i_fY-2) && (Y<=i_fY+2) ) )
+		if( ( (X>=i_fX-propToleranceX) && (X<=i_fX+propToleranceX) )  && ( (Y>=i_fY-propToleranceY) && (Y<=i_fY+propToleranceY) ) )
 		{
 			// element have to be deleted
 			deletFlag=tTrue;
@@ -308,7 +368,7 @@ tResult cXMLWriter::DomAddElement(QDomDocument &io_domDoc, QDomElement &io_domRo
 }
 
 // delete element of DOM if all attributes are same
-tResult cXMLWriter::DomDeleteElement(QDomDocument &io_domDoc, tInt16 i_iID, tFloat32 i_fX, tFloat32 i_fY, tFloat32 i_fRadius, tFloat32 i_fDirection)
+tResult cXMLWriter::DomDeleteElement(QDomDocument &io_domDoc, tFloat32 i_fX, tFloat32 i_fY)
 {
 
 	QDomElement domEleConfig = io_domDoc.documentElement();
@@ -321,11 +381,11 @@ tResult cXMLWriter::DomDeleteElement(QDomDocument &io_domDoc, tInt16 i_iID, tFlo
 		QDomElement domEleCounter = domNodCounter.toElement();
 
 		// check if the ID is the same
-		tInt16 ID = domEleCounter.attribute("id").toInt();
+		//tInt16 ID = domEleCounter.attribute("id").toInt();
 		tFloat32 X = domEleCounter.attribute("x").toFloat();
 		tFloat32 Y = domEleCounter.attribute("y").toFloat();
 
-		if( (ID==i_iID) && (X==i_fX) && (Y==i_fY) )
+		if( (X==i_fX) && (Y==i_fY) )
 		{
 			// element have to be deleted
 			deletFlag=tTrue;

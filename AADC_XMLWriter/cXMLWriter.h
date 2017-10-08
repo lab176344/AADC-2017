@@ -136,10 +136,12 @@ protected:
 	tResult ProcessInputTrafficSign(IMediaSample* pMediaSampleIn, tTimeStamp tsInputTime);
 	tResult ProcessInputParkingSpace(IMediaSample* pMediaSampleIn, tTimeStamp tsInputTime);
 	tResult ProcessInputObstacle(IMediaSample* pMediaSampleIn, tTimeStamp tsInputTime);
+	
+	tResult PropertyChanged(const char* strProperty);
+	tResult ReadProperties(const tChar* strPropertyName);
 
 	/* DOM Member Variables*/
 
-	
 
 
 	/* DOM Functions*/
@@ -148,7 +150,9 @@ protected:
 
 	tResult DomAddElement(QDomDocument &io_domDoc, QDomElement &io_domRootElement, QString i_qstrString, tInt16 i_iID, tFloat32 i_fX, tFloat32 i_fY, tFloat32 i_fRadius, tFloat32 i_fDirection);
 	
-	tResult DomDeleteElement(QDomDocument &io_domDoc, tInt16 i_iID, tFloat32 i_fX, tFloat32 i_fY, tFloat32 i_fRadius, tFloat32 i_fDirection);
+	//tResult DomDeleteElement(QDomDocument &io_domDoc, tInt16 i_iID, tFloat32 i_fX, tFloat32 i_fY, tFloat32 i_fRadius, tFloat32 i_fDirection);
+	
+	tResult DomDeleteElement(QDomDocument &io_domDoc,  tFloat32 i_fX, tFloat32 i_fY);
 
 	tResult ReadXML(QDomDocument &o_docDocument);
 
@@ -234,6 +238,9 @@ public:
 
 
 private: // private methods
+
+	// Properties
+	tFloat32    propToleranceX, propToleranceY;
 
 
 };
