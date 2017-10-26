@@ -57,6 +57,11 @@ protected:
     /*! output for rgb image */
     cVideoPin           m_oVideoOutputPin;
 
+	// Start Testing
+	cInputPin m_oStart;
+	cObjectPtr<IMediaTypeDescription> m_pDescStart;
+
+
 	// input from situation detection
 	cInputPin m_oSituationDetection;
 	cObjectPtr<IMediaTypeDescription> m_pDescSituationDetection;
@@ -82,6 +87,10 @@ protected:
 	cObjectPtr<IMediaTypeDescription> m_pDescEdgeLine;
 	cInputPin m_oEdgePoint;
 	cObjectPtr<IMediaTypeDescription> m_pDescEdgePoint;
+
+	// Infos about RoadSignExt
+	cInputPin m_oRoadSignExt;
+	cObjectPtr<IMediaTypeDescription> m_pDescRoadSignExt;
 
 	// Check Traffic for Crossing
 	cInputPin m_oCheckTraffic;
@@ -145,6 +154,18 @@ protected:
 	tFloat32 m_fDistEdge1;
 	tBool m_bEdge2;
 	tFloat32 m_fDistEdge2;
+
+	// Infos about RoadSign
+	tFloat32 m_f32DistanceRoadSignY;
+	tFloat32 m_f32DistanceRoadSignX;
+	tFloat32 m_f32DistanceOverall_SignPassed;
+	tBool	 m_bStopSignPassed;
+	tFloat32 m_iDistance2driveAfterRoadSign;
+	tFloat32 m_f32MinDistance2SeeRoadSign;
+	tFloat32 m_f32ArrayDistanceRoadSignX[10];
+	tBool	 m_bRoadSignDetected;
+        tInt     m_iRoadSignNotDetectedCounter;
+        tBool    m_bRoadSignPassed;
 
 	// steering input of lanefollower
 	tFloat32 m_fInputSteeringOfLaneFollower;
